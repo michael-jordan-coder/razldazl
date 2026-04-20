@@ -1,0 +1,32 @@
+{
+  "name": "@product/ast-engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@babel/parser": "^7.26.3",
+    "@babel/traverse": "^7.26.4",
+    "@babel/types": "^7.26.3",
+    "@product/protocol": "workspace:*",
+    "recast": "^0.23.9"
+  },
+  "devDependencies": {
+    "@types/babel__traverse": "^7.20.6",
+    "fast-check": "^3.23.2",
+    "vitest": "^2.1.8"
+  },
+  "license": "MIT"
+}

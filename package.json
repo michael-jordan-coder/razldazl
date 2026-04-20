@@ -1,0 +1,26 @@
+{
+  "name": "@product/root",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.15.1",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test --filter=!@product/e2e",
+    "dev": "turbo run dev --parallel",
+    "e2e": "pnpm --filter @product/e2e test",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "eslint": "^9.18.0",
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.3",
+    "typescript": "~5.7.3",
+    "typescript-eslint": "^8.21.0"
+  }
+}

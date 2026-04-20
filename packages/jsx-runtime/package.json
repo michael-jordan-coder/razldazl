@@ -1,0 +1,31 @@
+{
+  "name": "@product/jsx-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./dist/jsx-runtime.js",
+    "./jsx-runtime": "./dist/jsx-runtime.js",
+    "./jsx-dev-runtime": "./dist/jsx-runtime.js",
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.7",
+    "@vitest/ui": "^2.1.8",
+    "happy-dom": "^16.3.0",
+    "react-dom": "^19.0.0",
+    "@types/react-dom": "^19.0.3",
+    "vitest": "^2.1.8"
+  },
+  "license": "MIT"
+}
