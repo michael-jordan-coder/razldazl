@@ -88,7 +88,10 @@ export const App = () => {
   };
 
   return (
-    <div className="flex h-full bg-slate-950 text-slate-100">
+    <div
+      className="flex h-full"
+      style={{ background: 'var(--ui-bg)', color: 'var(--ui-text)' }}
+    >
       <Sidebar
         connected={ws.ready}
         previewReady={selectionApi.previewReady}

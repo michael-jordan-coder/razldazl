@@ -1,10 +1,6 @@
-// Tailwind color-grid picker in a popover. Rows = hues, cols = shades. The
-// swatch that's currently applied is ringed. Click a cell to apply.
-//
-// Swatches are rendered with inline hex (from tailwind-palette.ts) so we don't
-// need to safelist ~200 bg-* classes in the editor-ui's own CSS. The class
-// we *write* to the user's demo-app is a Tailwind utility — its Tailwind
-// build will generate the CSS.
+// UI3-style color input: [swatch] value-label [×-button] — single 24px row
+// with bg-input fill. Clicking the row opens a popover grid of Tailwind
+// shades. Swatches rendered with inline hex (see tailwind-palette).
 
 import { useState } from 'react';
 import { HUES, SHADES, PALETTE, type Hue, type Shade } from './tailwind-palette.js';
@@ -13,82 +9,92 @@ import { PanelPopover } from './primitives/Popover.js';
 export type ColorPrefix = 'bg' | 'text' | 'border';
 
 export interface ColorPickerProps {
-  label: string;
   prefix: ColorPrefix;
   currentClass: string | null;
   disabled?: boolean;
   onPick: (cls: string | null) => void;
 }
 
-export const ColorPicker = ({
-  label,
-  prefix,
-  currentClass,
-  disabled,
-  onPick,
-}: ColorPickerProps) => {
+export const ColorPicker = ({ prefix, currentClass, disabled, onPick }: ColorPickerProps) => {
   const [open, setOpen] = useState(false);
   const parsed = parseColorClass(currentClass);
   const currentHex = parsed ? (PALETTE[parsed.hue]?.[parsed.shade] ?? null) : null;
 
   return (
-    <div className="flex items-center justify-between gap-2 text-xs">
-      <span className="text-slate-400">{label}</span>
-      <PanelPopover
-        open={open}
-        onOpenChange={setOpen}
-        align="end"
-        trigger={
-          <button
-            type="button"
-            disabled={disabled}
-            className="flex items-center gap-2 rounded border border-slate-800 bg-slate-950 px-1.5 py-0.5 hover:border-slate-700 disabled:opacity-40"
-          >
+    <PanelPopover
+      open={open}
+      onOpenChange={setOpen}
+      align="end"
+      trigger={
+        <button
+          type="button"
+          disabled={disabled}
+          className="flex h-6 w-full items-center gap-2 rounded-[5px] px-1.5 text-left text-[11px] leading-[16px] tracking-[0.055px] disabled:opacity-40 data-[state=open]:ring-1 data-[state=open]:ring-[var(--ui-accent)]"
+          style={{
+            background: 'var(--ui-bg-input)',
+            color: 'var(--ui-text)',
+          }}
+        >
+          <Swatch hex={currentHex} />
+          <span className="flex-1 truncate font-medium">
+            {parsed ? `${parsed.hue}-${parsed.shade}` : '—'}
+          </span>
+          {parsed && (
             <span
-              className="inline-block h-4 w-4 rounded border border-slate-700"
-              style={currentHex ? { background: currentHex } : { background: 'transparent' }}
-            />
-            <span className="font-mono text-slate-200">{parsed ? `${parsed.hue}-${parsed.shade}` : '—'}</span>
-          </button>
-        }
-      >
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between px-1 pb-1 text-[10px] uppercase tracking-wider text-slate-500">
-            <span>{prefix}-*</span>
-            {parsed && (
-              <button
-                type="button"
-                className="text-slate-500 hover:text-slate-300"
-                onClick={() => {
-                  onPick(null);
-                  setOpen(false);
-                }}
-              >
-                clear
-              </button>
-            )}
-          </div>
-          <div
-            className="grid gap-0.5"
-            style={{ gridTemplateColumns: `repeat(${SHADES.length}, 1.25rem)` }}
-          >
-            {HUES.map((hue) => (
-              <Row
-                key={hue}
-                hue={hue}
-                selectedShade={parsed?.hue === hue ? parsed.shade : null}
-                onPick={(shade) => {
-                  onPick(`${prefix}-${hue}-${shade}`);
-                  setOpen(false);
-                }}
-              />
-            ))}
-          </div>
+              role="button"
+              tabIndex={-1}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPick(null);
+              }}
+              className="inline-flex h-4 w-4 items-center justify-center rounded-sm hover:bg-[var(--ui-border-strong)]"
+              style={{ color: 'var(--ui-text-secondary)' }}
+              title="Clear"
+            >
+              ×
+            </span>
+          )}
+        </button>
+      }
+    >
+      <div className="flex flex-col gap-1" style={{ width: '264px' }}>
+        <div
+          className="flex items-center justify-between px-0.5 pb-1 text-[10px] uppercase tracking-wider"
+          style={{ color: 'var(--ui-text-tertiary)' }}
+        >
+          <span>{prefix}-*</span>
+          <span>Tailwind</span>
         </div>
-      </PanelPopover>
-    </div>
+        <div
+          className="grid gap-[2px]"
+          style={{ gridTemplateColumns: `repeat(${SHADES.length}, 1fr)` }}
+        >
+          {HUES.map((hue) => (
+            <Row
+              key={hue}
+              hue={hue}
+              selectedShade={parsed?.hue === hue ? parsed.shade : null}
+              onPick={(shade) => {
+                onPick(`${prefix}-${hue}-${shade}`);
+                setOpen(false);
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    </PanelPopover>
   );
 };
+
+const Swatch = ({ hex }: { hex: string | null }) => (
+  <span
+    className="inline-block h-[14px] w-[14px] shrink-0 rounded-[2px]"
+    style={{
+      background: hex ?? 'transparent',
+      boxShadow: 'inset 0 0 0 0.5px var(--ui-border-strong)',
+    }}
+  />
+);
 
 const Row = ({
   hue,
@@ -109,13 +115,13 @@ const Row = ({
           type="button"
           title={`${hue}-${shade}`}
           onClick={() => onPick(shade)}
-          className={[
-            'h-5 w-5 rounded-sm border transition',
-            active
-              ? 'border-white ring-2 ring-white/40'
-              : 'border-black/20 hover:scale-110',
-          ].join(' ')}
-          style={{ background: hex }}
+          className="h-5 w-5 rounded-[2px] transition-transform hover:scale-110"
+          style={{
+            background: hex,
+            boxShadow: active
+              ? '0 0 0 1.5px #fff, 0 0 0 2.5px var(--ui-accent)'
+              : 'inset 0 0 0 0.5px rgba(0,0,0,0.25)',
+          }}
         />
       );
     })}

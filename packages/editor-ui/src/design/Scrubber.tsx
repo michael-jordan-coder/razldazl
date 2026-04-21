@@ -1,30 +1,29 @@
-// Figma-style numeric scrubber: drag horizontally on the label to step
-// through a fixed scale. The value commits on release (one edit per drag).
-// Click focus + arrow keys to step with the keyboard. Double-click the value
-// to type it directly (typing is scale-free — snaps to nearest step).
+// UI3-style numeric input with a letter-icon prefix on the left and the
+// value right-aligned. Horizontal pointer drag on the icon scrubs through
+// the scale — Figma behavior. Double-click to type. Arrow keys step.
 
 import { useEffect, useRef, useState } from 'react';
 
 export interface ScrubberProps {
+  /** Letter or short glyph rendered in the 24×24 prefix slot. */
+  iconLabel: string;
+  /** Accessible name, shown as tooltip/title. */
   label: string;
-  /** Step values in ascending order. */
   scale: readonly number[];
-  /** Current index into scale, or null when the value is unset. */
   valueIndex: number | null;
-  /** How the panel displays the value in the value slot (e.g. "2 · 8px"). */
-  formatValue: (step: number) => string;
-  /** Committed value — fires on release, arrow key, or typed commit. */
+  /** Suffix appended after the value, e.g. "px". */
+  unit?: string;
   onCommit: (step: number) => void;
   disabled?: boolean;
-  /** Pixels of horizontal drag per step. Default 6. */
   pxPerStep?: number;
 }
 
 export const Scrubber = ({
+  iconLabel,
   label,
   scale,
   valueIndex,
-  formatValue,
+  unit,
   onCommit,
   disabled,
   pxPerStep = 6,
@@ -71,10 +70,12 @@ export const Scrubber = ({
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (disabled) return;
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown')
+      return;
     e.preventDefault();
     const cur = valueIndex ?? 0;
-    const next = clamp(cur + (e.key === 'ArrowRight' ? 1 : -1), 0, scale.length - 1);
+    const dir = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? 1 : -1;
+    const next = clamp(cur + dir, 0, scale.length - 1);
     const v = scale[next];
     if (v !== undefined) onCommit(v);
   };
@@ -89,21 +90,36 @@ export const Scrubber = ({
     if (v !== undefined) onCommit(v);
   };
 
+  const value = displayIndex !== null ? scale[displayIndex] : null;
+  const valueText = value === null ? '—' : unit ? `${value}${unit}` : String(value);
+
   return (
     <div
       ref={rootRef}
-      className="flex items-center justify-between gap-2 text-xs"
-      data-disabled={disabled ? 'true' : undefined}
+      className="flex h-6 w-full items-center rounded-[5px] text-[11px] leading-[16px] tracking-[0.055px]"
+      style={{
+        background: 'var(--ui-bg-input)',
+        color: 'var(--ui-text)',
+        opacity: disabled ? 0.4 : 1,
+      }}
+      title={label}
+      onDoubleClick={(e) => {
+        if (disabled) return;
+        if (e.target !== e.currentTarget && (e.target as HTMLElement).tagName === 'INPUT') return;
+        setTyping(value !== null ? String(value) : '');
+      }}
     >
       <button
         type="button"
-        className="flex-1 cursor-ew-resize select-none text-left text-slate-400 hover:text-slate-200 focus:outline-none focus:text-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex h-6 w-6 shrink-0 cursor-ew-resize items-center justify-center select-none"
+        style={{ color: 'var(--ui-text-secondary)' }}
         onPointerDown={onPointerDown}
         onKeyDown={onKeyDown}
         disabled={disabled}
         tabIndex={0}
+        aria-label={label}
       >
-        {label}
+        {iconLabel}
       </button>
       {typing !== null ? (
         <input
@@ -119,21 +135,11 @@ export const Scrubber = ({
               setTyping(null);
             }
           }}
-          className="w-16 rounded border border-indigo-500 bg-slate-950 px-1.5 py-0.5 text-right font-mono text-slate-100 focus:outline-none"
+          className="h-6 flex-1 bg-transparent pr-2 text-[11px] text-right outline-none"
+          style={{ color: 'var(--ui-text)' }}
         />
       ) : (
-        <button
-          type="button"
-          className="w-20 rounded border border-slate-800 bg-slate-950 px-1.5 py-0.5 text-right font-mono text-slate-200 hover:border-slate-700 disabled:opacity-40"
-          disabled={disabled}
-          onDoubleClick={() => {
-            setTyping(
-              displayIndex !== null ? String(scale[displayIndex] ?? '') : '',
-            );
-          }}
-        >
-          {displayIndex !== null ? formatValue(scale[displayIndex]!) : '—'}
-        </button>
+        <span className="flex-1 truncate pr-2 text-right font-medium">{valueText}</span>
       )}
     </div>
   );

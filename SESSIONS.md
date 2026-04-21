@@ -13,6 +13,50 @@ A terse log of what changed each working session. Add an entry at the **top** ev
 
 ---
 
+## 2026-04-21 — UI3 visual system (Figma-style panels)
+
+**Goal:** Restyle both panels (Sidebar + DesignPanel) to Figma UI3's visual language — dense, dark, 11px body text, 24px input rows, 5px radius, Figma-blue (#0d99ff) accent, subtle borders.
+
+**Shipped:**
+- `editor-ui/src/index.css` — UI3 design tokens as CSS custom properties: `--ui-bg`, `--ui-bg-input`, `--ui-border`, `--ui-text`, `--ui-text-secondary`, `--ui-accent`, radius, font stack (Inter), body/heading font sizes. Tokens mapped from Figma UI3 library (file `mGoMHhP8FKt5tIzObcTk9M`).
+- Redesigned `DesignPanel.tsx` — 260px wide, flat section stack with 40px headers, 11px body, generous but not wasteful padding (pl-4, pr-2). Sections separated by 1px border-b. Field labels are 64px-wide left column; control takes the rest.
+- Redesigned `Sidebar.tsx` — 300px chat panel with matching header, compact connection-status row, chat parts as 5px-radius cards, Figma-blue send button, `⌘Z`/`⌘⇧Z`/`×` icon buttons in the header.
+- `design/Scrubber.tsx` rewrite — UI3 numeric-input pattern (single 24px rect, letter-icon prefix slot, value right-aligned, whole rect is the drag surface; double-click to type; arrow/up/down to step).
+- `design/ColorPicker.tsx` rewrite — 24px row with 14px swatch + class name + inline × clear button; popover grid uses inset box-shadow for selection and a thin border for contrast on white shades.
+- `design/primitives/Popover.tsx` and `Select.tsx` rewrite — dark UI3 styling, 5px radius, subtle 0.5px inner border, Figma-style shadow (`0 8px 24px rgba(0,0,0,0.4)` + 0.5px hairline).
+- `PreviewPane.tsx` selection overlay — swapped indigo for UI3 blue (`box-shadow: 0 0 0 1.5px var(--ui-accent)`, no fill), more readable against typical page backgrounds.
+
+**Tokens captured from UI3:**
+| Token | Value |
+|---|---|
+| Body text | 11px / 16lh / weight 450 (Inter Medium) |
+| Strong body | 11px / 16lh / weight 550 (Inter Semi Bold) |
+| Section heading | 13px / 22lh / weight 500 |
+| Radius medium | 5px |
+| Radius small | 2px |
+| Input row height | 24px |
+| Section header height | 40px |
+| Panel padding | pl-16 pr-8 |
+| Accent | `#0d99ff` |
+| Panel bg (dark) | `#1e1e1e` |
+| Input fill | `#2c2c2c` |
+| Borders | `rgba(255,255,255,0.08)` |
+
+**Deferred:**
+- Segmented Design/Prototype tab at the top of the right panel (we only have Design for now).
+- Section collapse/expand (UI3 sections are always open here).
+- Proper Inter font import — using system Inter fallback. `Inter Variable` via a CDN or bundled would pixel-match.
+- Icon glyphs for properties (we use letters X/Y/↔ for spacing; Figma uses SVG icons).
+
+**Tests:** 35 passing. No logic changed; visual-only rewrite.
+
+**Gotchas:**
+- Tailwind v4 requires `rounded-[5px]` (arbitrary value) — the default scale doesn't include 5px. All panel radii use arbitrary values.
+- CSS custom properties on `:root` live in `index.css`, referenced from inline styles where class-based approaches (e.g. Tailwind's text-[var()]) would be verbose.
+- `focus-visible` gets the `:focus-visible { outline: 2px var(--ui-accent) }` global rule; Radix components respect this.
+
+---
+
 ## 2026-04-21 — Session undo/redo
 
 **Goal:** Every user action (panel control click or AI turn) becomes an atomic undoable unit. ⌘Z reverts, ⌘⇧Z redoes. No lossy hashes — full file snapshots.

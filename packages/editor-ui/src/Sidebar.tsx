@@ -1,8 +1,6 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import type { ChatPart } from '@product/protocol';
 import type { Selection } from './useSelection.js';
-// Selection source info is already shown in the Design panel on the right,
-// so the sidebar drops the "Selected" section to stay focused on chat.
 
 export interface SidebarProps {
   connected: boolean;
@@ -47,80 +45,95 @@ export const Sidebar = ({
   };
 
   return (
-    <aside className="w-96 flex flex-col border-r border-slate-800 bg-slate-900">
-      <header className="flex items-center justify-between border-b border-slate-800 p-3 text-xs text-slate-400">
-        <div className="flex items-center gap-2">
-          <span
-            className={`inline-block h-2 w-2 rounded-full ${
-              connected ? 'bg-emerald-400' : 'bg-rose-400'
-            }`}
-            aria-label={connected ? 'connected' : 'disconnected'}
-          />
-          server {connected ? 'connected' : 'offline'}
-          <span className="mx-1">·</span>
-          preview {previewReady ? 'ready' : 'loading'}
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
+    <aside
+      className="flex w-[300px] shrink-0 flex-col border-r text-[11px] leading-[16px]"
+      style={{ background: 'var(--ui-bg)', borderColor: 'var(--ui-border)' }}
+    >
+      <header
+        className="flex h-[40px] shrink-0 items-center justify-between border-b pl-4 pr-2 text-[13px] font-medium"
+        style={{ borderColor: 'var(--ui-border)' }}
+      >
+        <span>Chat</span>
+        <div className="flex items-center gap-0.5">
+          <IconButton
+            title="Undo (⌘Z)"
             disabled={!canUndo}
             onClick={onUndo}
-            title="Undo (⌘Z)"
-            className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200 disabled:opacity-30 disabled:hover:bg-transparent"
-          >
-            ↶{undoCount > 0 ? ` ${undoCount}` : ''}
-          </button>
-          <button
-            type="button"
+            label={`↶${undoCount > 0 ? ` ${undoCount}` : ''}`}
+          />
+          <IconButton
+            title="Redo (⌘⇧Z)"
             disabled={!canRedo}
             onClick={onRedo}
-            title="Redo (⌘⇧Z)"
-            className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200 disabled:opacity-30 disabled:hover:bg-transparent"
-          >
-            ↷{redoCount > 0 ? ` ${redoCount}` : ''}
-          </button>
-          <span className="mx-1 text-slate-700">|</span>
-          <button
-            type="button"
-            className="text-slate-500 hover:text-slate-300"
-            onClick={onClear}
-          >
-            clear
-          </button>
+            label={`↷${redoCount > 0 ? ` ${redoCount}` : ''}`}
+          />
+          <IconButton title="Clear" onClick={onClear} label="×" />
         </div>
       </header>
 
-      <section className="flex-1 overflow-y-auto p-3 text-sm">
-        <ul className="space-y-2">
-          {chatParts.map((p, i) => (
-            <li key={`${p.kind}-${i}`} className="rounded border border-slate-800 bg-slate-950 p-2">
-              <PartView part={p} />
-            </li>
-          ))}
-          {chatParts.length === 0 && (
-            <li className="text-xs text-slate-500">No messages yet.</li>
-          )}
-        </ul>
+      <div
+        className="flex items-center gap-3 border-b px-4 py-2 text-[10px] tracking-[0.055px]"
+        style={{ borderColor: 'var(--ui-border)', color: 'var(--ui-text-secondary)' }}
+      >
+        <span className="inline-flex items-center gap-1.5">
+          <Dot ok={connected} />
+          {connected ? 'server' : 'offline'}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <Dot ok={previewReady} />
+          {previewReady ? 'preview' : 'loading'}
+        </span>
+      </div>
+
+      <section
+        className="flex-1 overflow-y-auto px-3 py-3"
+        style={{ background: 'var(--ui-bg)' }}
+      >
+        {chatParts.length === 0 ? (
+          <div className="text-[11px]" style={{ color: 'var(--ui-text-tertiary)' }}>
+            Describe a change. Select an element first, or let me find it.
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-1.5">
+            {chatParts.map((p, i) => (
+              <li key={`${p.kind}-${i}`}>
+                <PartView part={p} />
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
-      <form onSubmit={submit} className="border-t border-slate-800 p-3">
+      <form
+        onSubmit={submit}
+        className="border-t p-2"
+        style={{ borderColor: 'var(--ui-border)' }}
+      >
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder={selection ? 'Describe a change…' : 'Select something first'}
-          className="w-full resize-none rounded bg-slate-950 border border-slate-800 p-2 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500"
+          placeholder="Describe a change…"
+          className="w-full resize-none rounded-[5px] p-2 text-[11px] leading-[16px] outline-none placeholder:text-[var(--ui-text-tertiary)]"
+          style={{
+            background: 'var(--ui-bg-input)',
+            color: 'var(--ui-text)',
+          }}
           rows={3}
           disabled={sending || !connected}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(e);
           }}
         />
-        <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-          <span>⌘/Ctrl + Enter to send</span>
+        <div
+          className="mt-1 flex items-center justify-between text-[10px]"
+          style={{ color: 'var(--ui-text-tertiary)' }}
+        >
+          <span>⌘↵ to send</span>
           <button
             type="submit"
             disabled={sending || !connected || !message.trim()}
-            className="rounded bg-indigo-500 px-3 py-1 text-xs font-medium text-white disabled:opacity-40"
+            className="h-6 rounded-[5px] px-2.5 text-[11px] font-medium disabled:opacity-40"
+            style={{ background: 'var(--ui-accent)', color: '#fff' }}
           >
             {sending ? 'Working…' : 'Send'}
           </button>
@@ -130,46 +143,101 @@ export const Sidebar = ({
   );
 };
 
+const IconButton = ({
+  label,
+  title,
+  onClick,
+  disabled,
+}: {
+  label: ReactNode;
+  title: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) => (
+  <button
+    type="button"
+    title={title}
+    disabled={disabled}
+    onClick={onClick}
+    className="inline-flex h-6 min-w-6 items-center justify-center rounded-[3px] px-1.5 text-[11px] hover:bg-[var(--ui-bg-hover)] disabled:opacity-30 disabled:hover:bg-transparent"
+    style={{ color: 'var(--ui-text-secondary)' }}
+  >
+    {label}
+  </button>
+);
+
+const Dot = ({ ok }: { ok: boolean }) => (
+  <span
+    className="inline-block h-1.5 w-1.5 rounded-full"
+    style={{ background: ok ? '#3bc876' : '#f24822' }}
+  />
+);
+
 const PartView = ({ part }: { part: ChatPart }) => {
   switch (part.kind) {
     case 'text':
-      return <div className="whitespace-pre-wrap text-slate-200">{part.text}</div>;
+      return (
+        <div
+          className="whitespace-pre-wrap rounded-[5px] px-2 py-1.5 text-[11px]"
+          style={{ background: 'var(--ui-bg-input)', color: 'var(--ui-text)' }}
+        >
+          {part.text}
+        </div>
+      );
     case 'tool-call':
       return (
-        <div className="space-y-1">
-          <div className="text-xs uppercase tracking-wide text-indigo-300">
-            tool · {part.tool}{' '}
+        <div
+          className="rounded-[5px] px-2 py-1.5 text-[10px]"
+          style={{
+            background: 'var(--ui-bg-input)',
+            color: 'var(--ui-text-secondary)',
+          }}
+        >
+          <div className="flex items-center gap-1.5">
+            <span style={{ color: 'var(--ui-accent)' }}>{part.tool}</span>
             <span
-              className={
-                part.state === 'running'
-                  ? 'text-amber-300'
-                  : part.state === 'success'
-                    ? 'text-emerald-300'
-                    : 'text-rose-300'
-              }
+              style={{
+                color:
+                  part.state === 'running'
+                    ? '#f5a524'
+                    : part.state === 'success'
+                      ? '#3bc876'
+                      : 'var(--ui-danger)',
+              }}
             >
-              {part.state}
+              · {part.state}
             </span>
           </div>
-          <pre className="whitespace-pre-wrap text-xs text-slate-400">
-            {JSON.stringify(part.args, null, 2)}
-          </pre>
-          {part.error && <div className="text-xs text-rose-400">{part.error}</div>}
+          {part.error && (
+            <div className="mt-1 text-[10px]" style={{ color: 'var(--ui-danger)' }}>
+              {part.error}
+            </div>
+          )}
         </div>
       );
     case 'file-edit':
       return (
-        <div>
-          <div className="text-xs uppercase tracking-wide text-emerald-300">edit · {part.path}</div>
-          <pre className="mt-1 whitespace-pre-wrap text-xs text-slate-400">{part.diff}</pre>
+        <div
+          className="rounded-[5px] px-2 py-1.5 text-[10px]"
+          style={{ background: 'var(--ui-bg-input)' }}
+        >
+          <div style={{ color: '#3bc876' }}>edit · {part.path}</div>
+          <pre
+            className="mt-1 overflow-x-auto whitespace-pre-wrap font-mono text-[10px] leading-[14px]"
+            style={{ color: 'var(--ui-text-secondary)' }}
+          >
+            {part.diff}
+          </pre>
         </div>
       );
     case 'app-validation':
       return (
         <div
-          className={
-            part.ok ? 'text-xs text-emerald-300' : 'text-xs text-rose-300 whitespace-pre-wrap'
-          }
+          className="rounded-[5px] px-2 py-1.5 text-[10px]"
+          style={{
+            background: 'var(--ui-bg-input)',
+            color: part.ok ? '#3bc876' : 'var(--ui-danger)',
+          }}
         >
           validation {part.ok ? 'passed' : part.errors.join('\n')}
         </div>

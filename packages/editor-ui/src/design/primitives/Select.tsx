@@ -1,14 +1,11 @@
-// Thin wrapper around @radix-ui/react-select with dark-theme Tailwind styling
-// and an API that lets each item render its own preview content.
+// UI3-style select: 24px row, 5px radius, bg-input fill, 11px text.
 
 import * as Select from '@radix-ui/react-select';
 import type { ReactNode } from 'react';
 
 export interface PanelSelectItem<V extends string> {
   value: V;
-  /** Label shown in the trigger when selected. */
   label: ReactNode;
-  /** Row content in the dropdown — can include a rendered preview. */
   row: ReactNode;
 }
 
@@ -30,26 +27,38 @@ export function PanelSelect<V extends string>({
   return (
     <Select.Root value={value} onValueChange={(v) => onChange(v as V)} disabled={disabled}>
       <Select.Trigger
-        className="flex w-full items-center justify-between rounded border border-slate-800 bg-slate-950 px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 disabled:opacity-40"
+        className="flex h-6 w-full items-center justify-between rounded-[5px] px-2 text-[11px] leading-[16px] tracking-[0.055px] disabled:opacity-40 data-[state=open]:ring-1 data-[state=open]:ring-[var(--ui-accent)]"
+        style={{
+          background: 'var(--ui-bg-input)',
+          color: 'var(--ui-text)',
+        }}
       >
         <Select.Value placeholder={placeholder} />
-        <Select.Icon className="ml-2 text-slate-500">▾</Select.Icon>
+        <Select.Icon style={{ color: 'var(--ui-text-secondary)' }}>
+          <Caret />
+        </Select.Icon>
       </Select.Trigger>
       <Select.Portal>
         <Select.Content
           position="popper"
           sideOffset={4}
-          className="z-50 max-h-80 overflow-hidden rounded-md border border-slate-700 bg-slate-900 text-slate-200 shadow-lg shadow-black/40"
+          className="z-50 max-h-80 overflow-hidden rounded-[5px] border shadow-[0_8px_24px_rgba(0,0,0,0.4),0_0_0_0.5px_rgba(255,255,255,0.06)]"
+          style={{
+            background: 'var(--ui-bg)',
+            borderColor: 'var(--ui-border-strong)',
+            minWidth: 'var(--radix-select-trigger-width)',
+          }}
         >
           <Select.Viewport className="p-1">
             {items.map((item) => (
               <Select.Item
                 key={item.value}
                 value={item.value}
-                className="flex cursor-pointer items-center rounded px-2 py-1.5 text-xs outline-none data-[highlighted]:bg-indigo-500/20 data-[state=checked]:text-indigo-200"
+                className="flex cursor-pointer select-none items-center rounded-[3px] px-2 py-1 text-[11px] leading-[16px] outline-none data-[highlighted]:bg-[var(--ui-bg-hover)] data-[state=checked]:text-[var(--ui-accent)]"
+                style={{ color: 'var(--ui-text)' }}
               >
                 <Select.ItemText>{item.label}</Select.ItemText>
-                <div className="ml-auto pl-3">{item.row}</div>
+                <div className="ml-auto pl-3 flex items-center">{item.row}</div>
               </Select.Item>
             ))}
           </Select.Viewport>
@@ -58,3 +67,9 @@ export function PanelSelect<V extends string>({
     </Select.Root>
   );
 }
+
+const Caret = () => (
+  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+  </svg>
+);

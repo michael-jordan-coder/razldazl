@@ -1,5 +1,4 @@
-// Thin wrapper around @radix-ui/react-popover with our dark-theme Tailwind
-// defaults. The UI lives in our source tree so we can restyle per-call.
+// UI3-style popover: compact dark panel, 5px radius, 8px shadow, subtle border.
 
 import * as Popover from '@radix-ui/react-popover';
 import type { ReactNode } from 'react';
@@ -27,8 +26,13 @@ export const PanelPopover = ({
       <Popover.Content
         align={align}
         side={side}
-        sideOffset={6}
-        className="z-50 rounded-md border border-slate-700 bg-slate-900 p-2 text-slate-200 shadow-lg shadow-black/40 outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
+        sideOffset={4}
+        className="z-50 rounded-[5px] border p-2 text-[11px] leading-[16px] shadow-[0_8px_24px_rgba(0,0,0,0.4),0_0_0_0.5px_rgba(255,255,255,0.06)] outline-none"
+        style={{
+          background: 'var(--ui-bg)',
+          borderColor: 'var(--ui-border-strong)',
+          color: 'var(--ui-text)',
+        }}
       >
         {children}
       </Popover.Content>
