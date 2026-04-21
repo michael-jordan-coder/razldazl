@@ -13,6 +13,38 @@ A terse log of what changed each working session. Add an entry at the **top** ev
 
 ---
 
+## 2026-04-21 — Structural AST edits (add / wrap / delete / move)
+
+**Goal:** Add the four structural primitives to the engine, protocol, and AI tool layer, so both the AI and future panel controls can change tree shape — not just attributes and text.
+
+**Shipped:**
+- `packages/protocol/src/index.ts` — `jsxElementDescriptorSchema`, `jsxPositionSchema`, and four new discriminants in `toolCallSchema`: `addElement`, `wrapElement`, `deleteElement`, `moveElement`. Wrapper descriptor omits `text` (the child is the target element).
+- `packages/ast-engine/src/edit.ts` — `applyEdits` reworked into a two-pass: (1) build a `{line:col → {node, parent}}` target map up front, (2) mutate. Lets callers mix structural + attribute ops in one batch without coord drift. Four new mutators + helpers (`buildJSXElement`, `replaceInParent`, `containsNode`, `ensureClosingElement`). Extended `EditError` codes: `parent-self-closing`, `cannot-delete-root`, `invalid-move`, `invalid-parent`.
+- `packages/ai/src/tools.ts` + `turn.ts` — four new tool schemas exposed to Claude, system-prompt bullets, and corresponding dispatch + descriptor parsing in `runTool`. Centralized `EDIT_TOOL_NAMES` set. Fixed a pre-existing doc bug: `columnNumber` is 1-indexed, not 0-indexed.
+- `packages/server/src/server.ts` — `opFileName(op)` helper covers all six op variants in one place (used by both `applyEdit` and `groupOpsByFile`). Rejects cross-file `moveElement` with a clear error.
+- Tests — `structural-edits.test.ts` (new, 8 edge cases + batch-mix semantics), `edit.test.ts` (+7 smoke tests), `preserve-coords.test.ts` (+4 above-anchor property tests for structural ops), `tools.test.ts` updated to assert the new tool surface, `protocol.test.ts` updated for each new schema variant. **All 13 task runs green, 35 ast-engine tests passing, build clean on all 9 packages.**
+
+**Design decisions:**
+- *Target resolution up front.* Every op's coord resolves against the pre-batch AST. Node references survive mutations, so a delete followed by a setJSXProp doesn't suffer coord drift. Property-tested.
+- *Relaxed coord invariant for structural ops.* Documented in CLAUDE.md: strict for attribute/text ops, "above-anchor only" for structural. Below-anchor shifts are fine because HMR regenerates `__source`.
+- *Same-file moves only.* Cross-file move rejected at the server boundary. Waits on the multi-file transactional roadmap item.
+- *Descriptor shape.* `{ tag, props?: Record<string,string>, text? }`. No nested children in one call — chain ops instead. Covers ~95% of AI-driven structural asks; keeps the schema narrow.
+
+**Deferred (out of scope for this slice, called out in the plan):**
+- Editor-UI panel buttons for structural edits. The engine + AI tools prove out first; UI comes in a follow-up.
+- Cross-file moves. Blocked on multi-file transactional semantics.
+- Descriptor support for JSX expression attrs, nested JSX children, or component imports.
+- Auto-expanding a self-closing parent to accept new children. For now, rejected with `parent-self-closing`.
+
+**Gotchas worth knowing:**
+- `wrapElement` targeting the root of a component return works because `replaceInParent` falls back to scanning arbitrary parent keys (ReturnStatement.argument, ArrowFunctionExpression.body, etc.) when the parent isn't a JSXElement/JSXFragment.
+- `moveElement` clones the subtree (`t.cloneNode(node, true)`) before re-inserting. Avoids recast path invalidation when the same node is removed then attached elsewhere.
+- The `preserve-coords.test.ts` "above-anchor" helper uses source-order filtering (`l.line < anchorLine`), which is conservative — a stricter claim is possible but this shape is robust to recast's indentation choices.
+
+**Tests:** 35 ast-engine + 8 protocol + 4 ai + the unchanged rest → all 13 package runs green, build clean.
+
+---
+
 ## 2026-04-21 — `product-worker` subagent
 
 **Goal:** Create a project-level Claude Code agent that inherits all the architectural context, invariants, and scope filters needed to work on `/product` without reloading them every conversation.

@@ -180,3 +180,108 @@ describe('coordinate preservation', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Weaker invariant for structural edits: elements strictly *before* the
+// mutation anchor retain their coords. Elements at or after may shift —
+// HMR regenerates __source and the preview-agent re-locks selection from
+// the refreshed map, so downstream wiring stays correct.
+// ---------------------------------------------------------------------------
+
+function assertAboveAnchorStable(beforeLocs: Loc[], afterLocs: Loc[], anchorLine: number): void {
+  // Match elements by source-order index among those at lines < anchorLine.
+  const beforeAbove = beforeLocs.filter((l) => l.line < anchorLine);
+  const afterAbove = afterLocs.filter((l) => l.line < anchorLine);
+  expect(afterAbove.length).toBe(beforeAbove.length);
+  for (let i = 0; i < beforeAbove.length; i++) {
+    expect({ i, ...afterAbove[i]! }).toEqual({ i, ...beforeAbove[i]! });
+  }
+}
+
+describe('coordinate preservation — structural ops (above-anchor invariant)', () => {
+  const structural = `export const S = () => (
+  <section>
+    <header>
+      <h1>Title</h1>
+    </header>
+    <main>
+      <article>
+        <p>body</p>
+      </article>
+    </main>
+  </section>
+);
+`;
+
+  it('addElement at end of a mid-tree parent preserves coords above the parent', () => {
+    const before = collectJSXLocs(structural);
+    const parent = before.find((l) => l.tag === 'article')!;
+    const edited = applyEdits(structural, [
+      {
+        tool: 'addElement',
+        args: {
+          parent: { fileName: 'x.tsx', lineNumber: parent.line, columnNumber: parent.column },
+          position: 'end',
+          element: { tag: 'footer', text: 'end' },
+        },
+      },
+    ]);
+    const after = collectJSXLocs(edited);
+    assertAboveAnchorStable(before, after, parent.line);
+  });
+
+  it('wrapElement preserves coords above the target', () => {
+    const before = collectJSXLocs(structural);
+    const target = before.find((l) => l.tag === 'article')!;
+    const edited = applyEdits(structural, [
+      {
+        tool: 'wrapElement',
+        args: {
+          target: { fileName: 'x.tsx', lineNumber: target.line, columnNumber: target.column },
+          wrapper: { tag: 'div', props: { className: 'card' } },
+        },
+      },
+    ]);
+    const after = collectJSXLocs(edited);
+    assertAboveAnchorStable(before, after, target.line);
+  });
+
+  it('deleteElement preserves coords above the target', () => {
+    const before = collectJSXLocs(structural);
+    const target = before.find((l) => l.tag === 'header')!;
+    const edited = applyEdits(structural, [
+      {
+        tool: 'deleteElement',
+        args: {
+          target: { fileName: 'x.tsx', lineNumber: target.line, columnNumber: target.column },
+        },
+      },
+    ]);
+    const after = collectJSXLocs(edited);
+    assertAboveAnchorStable(before, after, target.line);
+  });
+
+  it('moveElement preserves coords above the earliest mutation point', () => {
+    const before = collectJSXLocs(structural);
+    // Move <p> (inside article) to be a child of <header>.
+    const target = before.find((l) => l.tag === 'p')!;
+    const newParent = before.find((l) => l.tag === 'header')!;
+    const edited = applyEdits(structural, [
+      {
+        tool: 'moveElement',
+        args: {
+          target: { fileName: 'x.tsx', lineNumber: target.line, columnNumber: target.column },
+          newParent: {
+            fileName: 'x.tsx',
+            lineNumber: newParent.line,
+            columnNumber: newParent.column,
+          },
+          position: 'end',
+        },
+      },
+    ]);
+    const after = collectJSXLocs(edited);
+    const anchor = Math.min(target.line, newParent.line);
+    assertAboveAnchorStable(before, after, anchor);
+  });
+});

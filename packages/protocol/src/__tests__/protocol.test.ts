@@ -32,6 +32,51 @@ describe('protocol schemas', () => {
     expect(parsed.tool).toBe('setJSXProp');
   });
 
+  it('accepts each structural tool-call variant', () => {
+    const source = { fileName: '/a.tsx', lineNumber: 1, columnNumber: 1 };
+    expect(
+      toolCallSchema.parse({
+        tool: 'addElement',
+        args: {
+          parent: source,
+          position: 'end',
+          element: { tag: 'div', props: { className: 'x' }, text: 'hi' },
+        },
+      }).tool,
+    ).toBe('addElement');
+
+    expect(
+      toolCallSchema.parse({
+        tool: 'wrapElement',
+        args: { target: source, wrapper: { tag: 'section' } },
+      }).tool,
+    ).toBe('wrapElement');
+
+    expect(
+      toolCallSchema.parse({
+        tool: 'deleteElement',
+        args: { target: source },
+      }).tool,
+    ).toBe('deleteElement');
+
+    expect(
+      toolCallSchema.parse({
+        tool: 'moveElement',
+        args: { target: source, newParent: source, position: 'start' },
+      }).tool,
+    ).toBe('moveElement');
+  });
+
+  it('strips text from wrapElement.wrapper (schema omits the field)', () => {
+    const source = { fileName: '/a.tsx', lineNumber: 1, columnNumber: 1 };
+    const parsed = toolCallSchema.parse({
+      tool: 'wrapElement',
+      args: { target: source, wrapper: { tag: 'div', text: 'no' } },
+    });
+    // @ts-expect-error — text is not a declared field on wrapper
+    expect(parsed.args.wrapper.text).toBeUndefined();
+  });
+
   it('accepts every envelope variant', () => {
     expect(
       wsEnvelopeSchema.parse({

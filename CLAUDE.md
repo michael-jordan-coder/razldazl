@@ -68,7 +68,7 @@ demo-app     ← Vite+React+Tailwind sample app being edited.
 
 ### Non-negotiable invariants
 
-- **Source-coord preservation.** Every AST edit must leave every non-edited JSX element's `{lineNumber, columnNumber}` identical. Property-tested in `packages/ast-engine/src/__tests__/preserve-coords.test.ts` — if you touch the engine, this test must pass.
+- **Source-coord preservation.** For attribute/text edits (`setJSXProp`, `updateJSXText`) every non-edited element's `{lineNumber, columnNumber}` must stay identical. For structural edits (`addElement`, `wrapElement`, `deleteElement`, `moveElement`) the rule is relaxed: elements strictly *before* the mutation point preserve their coords; elements after may shift, since HMR regenerates `__source` and the preview-agent re-locks from the refreshed map. Both forms are property-tested in `packages/ast-engine/src/__tests__/preserve-coords.test.ts` — if you touch the engine, these must pass.
 - **Zod at every trust boundary.** WS messages, postMessage, AI tool calls all parse through schemas in `packages/protocol/src/index.ts`. No `any` at boundaries.
 - **Protocol-first.** All wire types live in `@product/protocol`. No duplicated definitions.
 - **1-indexed columns.** React's JSX dev transform emits `column + 1` in `__source`. `ast-engine/src/edit.ts` does `source.columnNumber - 1` to match Babel's 0-indexed loc. Preserve this convention anywhere that matches coords.
@@ -109,7 +109,7 @@ Use these, not raw Tailwind colors. Compose via existing primitives in `packages
 
 Do not rabbit-hole into these without a direct ask:
 - Validation loop (AI sees typecheck/build errors, self-corrects) — highest-leverage next move
-- Structural edits (`addElement` / `wrapElement` / `deleteElement` / `moveElement`)
+- Editor-UI controls for structural edits (insert / wrap / delete buttons in the Design panel — engine + AI tools already landed)
 - State variants (hover / focus / disabled tabs in the design panel)
 - Fast Refresh restoration via source-map remap
 - Multi-file edits + transactional semantics

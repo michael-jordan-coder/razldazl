@@ -198,7 +198,7 @@ async function runTool(
       return { ok: true, content: JSON.stringify(matches) };
     }
 
-    if (use.name === 'setJSXProp' || use.name === 'updateJSXText') {
+    if (EDIT_TOOL_NAMES.has(use.name)) {
       const op = parseEditCall(use.name, use.input);
       if (!op) {
         return { ok: false, error: `${use.name}: invalid arguments` };
@@ -230,24 +230,95 @@ async function runTool(
   }
 }
 
+const EDIT_TOOL_NAMES = new Set([
+  'setJSXProp',
+  'updateJSXText',
+  'addElement',
+  'wrapElement',
+  'deleteElement',
+  'moveElement',
+]);
+
 function parseEditCall(name: string, input: unknown): ToolCall | null {
   if (!input || typeof input !== 'object') return null;
   const obj = input as Record<string, unknown>;
-  const source = obj.source;
-  if (!isJSXSource(source)) return null;
 
   if (name === 'setJSXProp') {
+    const source = obj.source;
+    if (!isJSXSource(source)) return null;
     const prop = obj.prop;
     const value = obj.value;
     if (typeof prop !== 'string' || typeof value !== 'string') return null;
     return { tool: 'setJSXProp', args: { source, prop, value } };
   }
   if (name === 'updateJSXText') {
+    const source = obj.source;
+    if (!isJSXSource(source)) return null;
     const text = obj.text;
     if (typeof text !== 'string') return null;
     return { tool: 'updateJSXText', args: { source, text } };
   }
+  if (name === 'addElement') {
+    const parent = obj.parent;
+    if (!isJSXSource(parent)) return null;
+    const position = obj.position;
+    if (position !== 'start' && position !== 'end') return null;
+    const element = parseElementDescriptor(obj.element);
+    if (!element) return null;
+    return { tool: 'addElement', args: { parent, position, element } };
+  }
+  if (name === 'wrapElement') {
+    const target = obj.target;
+    if (!isJSXSource(target)) return null;
+    const wrapper = parseElementDescriptor(obj.wrapper, /* allowText */ false);
+    if (!wrapper) return null;
+    return {
+      tool: 'wrapElement',
+      args: { target, wrapper: { tag: wrapper.tag, ...(wrapper.props ? { props: wrapper.props } : {}) } },
+    };
+  }
+  if (name === 'deleteElement') {
+    const target = obj.target;
+    if (!isJSXSource(target)) return null;
+    return { tool: 'deleteElement', args: { target } };
+  }
+  if (name === 'moveElement') {
+    const target = obj.target;
+    const newParent = obj.newParent;
+    if (!isJSXSource(target) || !isJSXSource(newParent)) return null;
+    const position = obj.position;
+    if (position !== 'start' && position !== 'end') return null;
+    return { tool: 'moveElement', args: { target, newParent, position } };
+  }
   return null;
+}
+
+function parseElementDescriptor(
+  v: unknown,
+  allowText = true,
+): { tag: string; props?: Record<string, string>; text?: string } | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  if (typeof o.tag !== 'string' || o.tag.length === 0) return null;
+
+  const out: { tag: string; props?: Record<string, string>; text?: string } = { tag: o.tag };
+
+  if (o.props !== undefined) {
+    if (!o.props || typeof o.props !== 'object' || Array.isArray(o.props)) return null;
+    const props: Record<string, string> = {};
+    for (const [k, val] of Object.entries(o.props as Record<string, unknown>)) {
+      if (typeof val !== 'string') return null;
+      props[k] = val;
+    }
+    out.props = props;
+  }
+
+  if (allowText && o.text !== undefined) {
+    if (typeof o.text !== 'string') return null;
+    out.text = o.text;
+  }
+
+  return out;
 }
 
 function isJSXSource(v: unknown): v is JSXSource {

@@ -10,24 +10,46 @@ describe('ai tools', () => {
       'findJSXElement',
       'setJSXProp',
       'updateJSXText',
+      'addElement',
+      'wrapElement',
+      'deleteElement',
+      'moveElement',
     ]);
   });
 
-  it('edit tools declare source coords as required input', () => {
-    const editTools = toolSchemas.filter((t) => t.name === 'setJSXProp' || t.name === 'updateJSXText');
-    expect(editTools).toHaveLength(2);
-    for (const tool of editTools) {
-      const schema = tool.input_schema as {
+  it('coord-bearing edit tools declare source coords as required input', () => {
+    // setJSXProp, updateJSXText, deleteElement take a single coord field named
+    // `source` / `target`. addElement, wrapElement, moveElement take multiple.
+    const coordFields: Record<string, string> = {
+      setJSXProp: 'source',
+      updateJSXText: 'source',
+      deleteElement: 'target',
+    };
+    for (const [tool, field] of Object.entries(coordFields)) {
+      const schema = toolSchemas.find((t) => t.name === tool)!.input_schema as {
         required: string[];
         properties: Record<string, { required?: string[] }>;
       };
-      expect(schema.required).toContain('source');
-      expect(schema.properties.source?.required).toEqual([
+      expect(schema.required).toContain(field);
+      expect(schema.properties[field]?.required).toEqual([
         'fileName',
         'lineNumber',
         'columnNumber',
       ]);
     }
+  });
+
+  it('structural-edit tools expose their expected shapes', () => {
+    const byName = Object.fromEntries(toolSchemas.map((t) => [t.name, t]));
+
+    const add = byName.addElement!.input_schema as { required: string[] };
+    expect(add.required).toEqual(['parent', 'position', 'element']);
+
+    const wrap = byName.wrapElement!.input_schema as { required: string[] };
+    expect(wrap.required).toEqual(['target', 'wrapper']);
+
+    const move = byName.moveElement!.input_schema as { required: string[] };
+    expect(move.required).toEqual(['target', 'newParent', 'position']);
   });
 
   it('system prompt mentions the tool discipline and design craft', () => {

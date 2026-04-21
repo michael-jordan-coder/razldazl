@@ -13,6 +13,10 @@ export const SYSTEM_PROMPT = `You are the design-engineering brain of a live Rea
 - findJSXElement — search one file by tag / textContains / classContains; returns [{source, tag, text, className}]
 - setJSXProp — set or update one JSX attribute at given source coords
 - updateJSXText — replace an element's text content
+- addElement — insert a new JSX element as a child of an existing parent (position: 'start' | 'end'). Use when adding a button, section, label, or any new structural node.
+- wrapElement — wrap a target element in a new parent ("put this in a container", "add a card around this").
+- deleteElement — remove an element. Never delete the root element of a component's return — the tool will reject.
+- moveElement — relocate an element to a new parent (same file only). Use for reordering or moving a node between containers.
 
 ## Workflow
 
@@ -84,11 +88,44 @@ const jsxSourceSchema = {
     },
     columnNumber: {
       type: 'integer' as const,
-      description: '0-indexed column of the JSX opening tag.',
+      description: '1-indexed column of the JSX opening tag.',
     },
   },
   required: ['fileName', 'lineNumber', 'columnNumber'],
   additionalProperties: false,
+};
+
+const jsxElementDescriptorSchema = {
+  type: 'object' as const,
+  properties: {
+    tag: {
+      type: 'string' as const,
+      description: 'Element tag name, e.g. "div", "button", "Button". Must be non-empty.',
+    },
+    props: {
+      type: 'object' as const,
+      description:
+        'Optional string-valued JSX attributes, e.g. { className: "text-xl", href: "/home" }. Only string values are supported.',
+      additionalProperties: { type: 'string' as const },
+    },
+    text: {
+      type: 'string' as const,
+      description:
+        'Optional text content. If present, the element is written with an open/close pair containing this text. If absent, the element is self-closing.',
+    },
+  },
+  required: ['tag'],
+};
+
+// Same as jsxElementDescriptorSchema without `text` — a wrapper's child is the
+// target element, so text would be discarded.
+const jsxWrapperDescriptorSchema = {
+  type: 'object' as const,
+  properties: {
+    tag: jsxElementDescriptorSchema.properties.tag,
+    props: jsxElementDescriptorSchema.properties.props,
+  },
+  required: ['tag'],
 };
 
 export const toolSchemas: Tool[] = [
@@ -174,6 +211,69 @@ export const toolSchemas: Tool[] = [
         },
       },
       required: ['source', 'text'],
+    },
+  },
+  {
+    name: 'addElement',
+    description:
+      'Insert a new JSX element as a child of an existing parent. Parent is identified by source coordinates. Use for adding buttons, sections, labels, etc. The element has a tag, optional string-valued props, and optional text content. To build a subtree with nested children, chain multiple addElement / wrapElement calls.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        parent: jsxSourceSchema,
+        position: {
+          type: 'string',
+          enum: ['start', 'end'],
+          description:
+            "Where to insert relative to the parent's existing children. 'start' = first child, 'end' = last child.",
+        },
+        element: jsxElementDescriptorSchema,
+      },
+      required: ['parent', 'position', 'element'],
+    },
+  },
+  {
+    name: 'wrapElement',
+    description:
+      'Wrap a target JSX element in a new parent. The target becomes the wrapper\'s only child. Use for "put this in a container", "add a card around this", "group these in a section". Works for any target including the root return of a component.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        target: jsxSourceSchema,
+        wrapper: jsxWrapperDescriptorSchema,
+      },
+      required: ['target', 'wrapper'],
+    },
+  },
+  {
+    name: 'deleteElement',
+    description:
+      "Remove a JSX element from the tree. Use only for explicit delete requests. The root JSX element of a component's return value cannot be deleted — the tool will reject.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        target: jsxSourceSchema,
+      },
+      required: ['target'],
+    },
+  },
+  {
+    name: 'moveElement',
+    description:
+      'Relocate a JSX element from its current parent to a new parent within the same file. Use for reordering children or moving a node between containers. Rejects moves into the element itself or one of its descendants.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        target: jsxSourceSchema,
+        newParent: jsxSourceSchema,
+        position: {
+          type: 'string',
+          enum: ['start', 'end'],
+          description:
+            "Where to insert within the new parent. 'start' = first child, 'end' = last child.",
+        },
+      },
+      required: ['target', 'newParent', 'position'],
     },
   },
 ];

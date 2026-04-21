@@ -185,7 +185,7 @@ function createToolExecutor(
       return findJSXElements(contents, abs, query);
     },
     async applyEdit(op) {
-      const fileName = op.args.source.fileName;
+      const fileName = opFileName(op);
       const abs = resolveInsideRoot(projectRoot, fileName);
       if (!abs) throw new Error(`Refusing to edit ${fileName}: outside project root`);
       const result = await editFile(abs, [op]);
@@ -226,12 +226,35 @@ async function listReactFiles(projectRoot: string, base: string): Promise<string
 function groupOpsByFile(ops: ToolCall[]): Map<string, ToolCall[]> {
   const byFile = new Map<string, ToolCall[]>();
   for (const op of ops) {
-    const fileName = op.args.source.fileName;
+    const fileName = opFileName(op);
     const list = byFile.get(fileName) ?? [];
     list.push(op);
     byFile.set(fileName, list);
   }
   return byFile;
+}
+
+// Every op carries at least one JSXSource. This helper returns the file that
+// op targets, and rejects cross-file structural ops (e.g. moveElement with
+// target and newParent in different files) with a clear error.
+function opFileName(op: ToolCall): string {
+  switch (op.tool) {
+    case 'setJSXProp':
+    case 'updateJSXText':
+      return op.args.source.fileName;
+    case 'addElement':
+      return op.args.parent.fileName;
+    case 'wrapElement':
+    case 'deleteElement':
+      return op.args.target.fileName;
+    case 'moveElement':
+      if (op.args.target.fileName !== op.args.newParent.fileName) {
+        throw new Error(
+          `moveElement across files is not supported (target=${op.args.target.fileName}, newParent=${op.args.newParent.fileName})`,
+        );
+      }
+      return op.args.target.fileName;
+  }
 }
 
 function resolveInsideRoot(root: string, requested: string): string | null {

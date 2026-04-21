@@ -38,9 +38,67 @@ export const updateJSXTextSchema = z.object({
   }),
 });
 
+// Structural edits — add, wrap, delete, move a JSX element. All four resolve
+// their targets against the AST at the start of a batch, so mixing structural
+// and attribute ops in one batch is safe.
+//
+// `tag` is the element's name (e.g. "div", "Button"). `props` are stringified
+// attribute values only for now — no expression attrs, no boolean shorthand.
+// `text` becomes the element's single JSXText child; omit for a self-closing
+// element. Nested children are not expressible in a descriptor — chain ops to
+// build a subtree.
+
+export const jsxElementDescriptorSchema = z.object({
+  tag: z.string().min(1),
+  props: z.record(z.string(), z.string()).optional(),
+  text: z.string().optional(),
+});
+export type JSXElementDescriptor = z.infer<typeof jsxElementDescriptorSchema>;
+
+export const jsxPositionSchema = z.union([z.literal('start'), z.literal('end')]);
+export type JSXPosition = z.infer<typeof jsxPositionSchema>;
+
+export const addElementSchema = z.object({
+  tool: z.literal('addElement'),
+  args: z.object({
+    parent: jsxSourceSchema,
+    position: jsxPositionSchema,
+    element: jsxElementDescriptorSchema,
+  }),
+});
+
+export const wrapElementSchema = z.object({
+  tool: z.literal('wrapElement'),
+  args: z.object({
+    target: jsxSourceSchema,
+    // Wrapper can't carry text — its child is the target element.
+    wrapper: jsxElementDescriptorSchema.omit({ text: true }),
+  }),
+});
+
+export const deleteElementSchema = z.object({
+  tool: z.literal('deleteElement'),
+  args: z.object({
+    target: jsxSourceSchema,
+  }),
+});
+
+export const moveElementSchema = z.object({
+  tool: z.literal('moveElement'),
+  args: z.object({
+    target: jsxSourceSchema,
+    newParent: jsxSourceSchema,
+    position: jsxPositionSchema,
+  }),
+});
+
 export const toolCallSchema = z.discriminatedUnion('tool', [
   setJSXPropSchema,
   updateJSXTextSchema,
+  addElementSchema,
+  wrapElementSchema,
+  deleteElementSchema,
+  moveElementSchema,
 ]);
 export type ToolCall = z.infer<typeof toolCallSchema>;
 
