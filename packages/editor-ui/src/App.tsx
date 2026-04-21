@@ -4,7 +4,8 @@ import { Sidebar } from './Sidebar.js';
 import { DesignPanel } from './DesignPanel.js';
 import { useSelection } from './useSelection.js';
 import { useWS } from './useWS.js';
-import type { ChatPart, ToolCall } from '@product/protocol';
+import { useUndo } from './useUndo.js';
+import type { ToolCall } from '@product/protocol';
 
 export const App = () => {
   const selectionApi = useSelection();
@@ -12,14 +13,18 @@ export const App = () => {
   const [sending, setSending] = useState(false);
   const [applying, setApplying] = useState(false);
 
-  // After a file edit, nudge the preview to re-lock the currently selected
-  // element by its source. HMR will normally have fired by the time this
-  // runs, so findNodeForSource has the fresh DOM to scan.
+  const undo = useUndo({
+    client: ws.client,
+    onPart: ws.appendPart,
+    subscribeToChat: ws.subscribeToChat,
+  });
+
+  // After any server-originated file edit, nudge the preview to re-lock the
+  // current selection — HMR will have fired by the time this runs.
   useEffect(() => {
     const last = ws.chatParts[ws.chatParts.length - 1];
     if (!last) return;
     if (last.kind === 'file-edit' && selectionApi.selection) {
-      // Give Vite HMR a tick to rebuild.
       const t = setTimeout(() => {
         selectionApi.relock(selectionApi.selection!.source);
       }, 150);
@@ -28,11 +33,30 @@ export const App = () => {
     return;
   }, [ws.chatParts, selectionApi]);
 
+  // ⌘Z / ⌘⇧Z hotkeys.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const meta = e.metaKey || e.ctrlKey;
+      if (!meta) return;
+      if (e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (undo.canUndo) void undo.undo();
+      } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
+        e.preventDefault();
+        if (undo.canRedo) void undo.redo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [undo]);
+
   const onApplyEdit = async (ops: ToolCall[]) => {
     if (!ws.client || !ws.ready) return;
     setApplying(true);
     try {
-      await ws.client.call('astEdit', 'apply', { ops });
+      await undo.runAction(async () => {
+        await ws.client!.call('astEdit', 'apply', { ops });
+      });
       if (selectionApi.selection) {
         setTimeout(() => {
           selectionApi.relock(selectionApi.selection!.source);
@@ -47,14 +71,16 @@ export const App = () => {
     if (!ws.client || !ws.ready) return;
     setSending(true);
     try {
-      appendLocalPart(ws, {
+      ws.appendPart({
         kind: 'text',
         id: `user-${Date.now()}`,
         text: `🧑 ${message}`,
       });
-      await ws.client.call('ai', 'runTurn', {
-        message,
-        context: { selectedSource: selectionApi.selection?.source ?? null },
+      await undo.runAction(async () => {
+        await ws.client!.call('ai', 'runTurn', {
+          message,
+          context: { selectedSource: selectionApi.selection?.source ?? null },
+        });
       });
     } finally {
       setSending(false);
@@ -69,6 +95,12 @@ export const App = () => {
         selection={selectionApi.selection}
         chatParts={ws.chatParts}
         sending={sending}
+        canUndo={undo.canUndo}
+        canRedo={undo.canRedo}
+        undoCount={undo.stack.length}
+        redoCount={undo.redoStack.length}
+        onUndo={() => void undo.undo()}
+        onRedo={() => void undo.redo()}
         onSend={onSend}
         onClear={() => {
           selectionApi.clear();
@@ -86,12 +118,3 @@ export const App = () => {
     </div>
   );
 };
-
-// Local-echo helper — shoves a synthetic part into the chat log so the user
-// sees their own message without waiting on the server round-trip.
-function appendLocalPart(ws: ReturnType<typeof useWS>, part: ChatPart): void {
-  // We don't have a setter exposed; route through the chat event namespace by
-  // faking a dispatch. In practice we'd refactor useWS to expose an appender,
-  // but keeping the public API minimal for now.
-  (ws as unknown as { chatParts: ChatPart[] }).chatParts.push(part);
-}

@@ -109,6 +109,10 @@ export const chatPartSchema = z.discriminatedUnion('kind', [
     beforeHash: z.string(),
     afterHash: z.string(),
     diff: z.string(),
+    // Full contents before/after the edit, carried so the client can revert
+    // without a round-trip. Only present for forward edits, not for reverts.
+    before: z.string().optional(),
+    after: z.string().optional(),
   }),
   z.object({
     kind: z.literal('app-validation'),
@@ -193,3 +197,20 @@ export const astEditApplyArgsSchema = z.object({
   ops: z.array(toolCallSchema).min(1),
 });
 export type AstEditApplyArgs = z.infer<typeof astEditApplyArgsSchema>;
+
+// ---------------------------------------------------------------------------
+// Raw file write — editor-ui → server. Used by undo/redo to restore a
+// previous snapshot verbatim, bypassing the AST engine.
+// ---------------------------------------------------------------------------
+
+export const fileWriteArgsSchema = z.object({
+  edits: z
+    .array(
+      z.object({
+        path: z.string().min(1),
+        contents: z.string(),
+      }),
+    )
+    .min(1),
+});
+export type FileWriteArgs = z.infer<typeof fileWriteArgsSchema>;

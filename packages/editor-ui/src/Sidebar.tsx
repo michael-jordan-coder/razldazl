@@ -10,6 +10,12 @@ export interface SidebarProps {
   selection: Selection | null;
   chatParts: ChatPart[];
   sending: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  undoCount: number;
+  redoCount: number;
+  onUndo(): void;
+  onRedo(): void;
   onSend(message: string): Promise<void> | void;
   onClear(): void;
 }
@@ -20,6 +26,12 @@ export const Sidebar = ({
   selection,
   chatParts,
   sending,
+  canUndo,
+  canRedo,
+  undoCount,
+  redoCount,
+  onUndo,
+  onRedo,
   onSend,
   onClear,
 }: SidebarProps) => {
@@ -48,13 +60,34 @@ export const Sidebar = ({
           <span className="mx-1">·</span>
           preview {previewReady ? 'ready' : 'loading'}
         </div>
-        <button
-          type="button"
-          className="text-slate-500 hover:text-slate-300"
-          onClick={onClear}
-        >
-          clear
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            disabled={!canUndo}
+            onClick={onUndo}
+            title="Undo (⌘Z)"
+            className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200 disabled:opacity-30 disabled:hover:bg-transparent"
+          >
+            ↶{undoCount > 0 ? ` ${undoCount}` : ''}
+          </button>
+          <button
+            type="button"
+            disabled={!canRedo}
+            onClick={onRedo}
+            title="Redo (⌘⇧Z)"
+            className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200 disabled:opacity-30 disabled:hover:bg-transparent"
+          >
+            ↷{redoCount > 0 ? ` ${redoCount}` : ''}
+          </button>
+          <span className="mx-1 text-slate-700">|</span>
+          <button
+            type="button"
+            className="text-slate-500 hover:text-slate-300"
+            onClick={onClear}
+          >
+            clear
+          </button>
+        </div>
       </header>
 
       <section className="flex-1 overflow-y-auto p-3 text-sm">

@@ -13,6 +13,32 @@ A terse log of what changed each working session. Add an entry at the **top** ev
 
 ---
 
+## 2026-04-21 — Session undo/redo
+
+**Goal:** Every user action (panel control click or AI turn) becomes an atomic undoable unit. ⌘Z reverts, ⌘⇧Z redoes. No lossy hashes — full file snapshots.
+
+**Shipped:**
+- `@product/protocol`: extended `file-edit` chat part with optional `before`/`after` full-content strings; added `fileWriteArgsSchema` for the raw file-write endpoint.
+- `@product/server`: `file-edit` parts now carry `before`/`after`. New `files.write` handler — raw sandboxed write used only by undo/redo. Does NOT emit chat parts (undo drives the UI client-side).
+- `packages/editor-ui/src/useUndo.ts` — hook exposing `runAction(fn)`, `undo()`, `redo()`, `canUndo`, `canRedo`. `runAction` opens a batch, subscribes to `file-edit` parts during the batch, and pushes one `UndoEntry` on close. Snapshots collapse per-file (first `before`, last `after`) so multi-tool AI turns still undo in one step.
+- `useWS` refactor: added `appendPart` (local-only chat messages, e.g. undo toasts) and `subscribeToChat` (internal subscription without duplicating state).
+- `App.tsx`: wraps `onSend` and `onApplyEdit` in `undo.runAction`. Registers `⌘Z` / `⌘⇧Z` / `⌘Y` hotkeys.
+- `Sidebar.tsx`: undo/redo buttons in the header with live counts (`↶ 3`, `↷ 1`).
+
+**Deferred:**
+- Persistent undo across page reloads (would need server-side store).
+- Granular per-tool-call undo within an AI turn (current model treats the whole turn as one step — intentional).
+- Undo preserves selection but doesn't restore the state variant tab (we don't have variant tabs yet).
+
+**Tests:** 35 passing (no new tests; undo is integration behavior exercised through the UI).
+
+**Gotchas:**
+- `files.write` must not emit `file-edit` chat parts or we'd loop the undo back onto itself. Hence a separate handler from `astEdit.apply`.
+- `UndoEntry.files` is collapsed: if a batch touches `App.tsx` twice, we keep the first `before` and last `after` so one revert is one write. Otherwise we'd queue N writes per undo and each HMR would fight the next.
+- No-op edits (where `before === after`) are filtered out during collapse so the stack doesn't fill with empty entries when the AI responds with only text.
+
+---
+
 ## 2026-04-21 — Deeper Design panel controls
 
 **Goal:** Replace the chip groups in the Design panel with proper inputs — numeric scrubber for spacing, color-grid picker for bg/text/border, size/weight/radius pickers with rendered previews.

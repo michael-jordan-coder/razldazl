@@ -9,7 +9,7 @@
 //   Vite (on the demo-app side) observes the file change and HMRs
 //   preview-agent re-locks selection; editor-ui observes the new chat parts
 
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { resolve, isAbsolute, relative, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import Anthropic from '@anthropic-ai/sdk';
@@ -19,6 +19,7 @@ import { editFile, findJSXElements } from '@product/ast-engine';
 import {
   aiRunTurnArgsSchema,
   astEditApplyArgsSchema,
+  fileWriteArgsSchema,
   readFileArgsSchema,
   type ChatPart,
   type ToolCall,
@@ -86,6 +87,20 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
         const contents = await readFile(abs, 'utf8');
         return { path: args.path, contents };
       },
+      // Raw write — used by undo/redo to restore a snapshot verbatim. Does not
+      // emit file-edit chat parts (the client is driving undo and already
+      // knows what it wrote). Sandboxed to the project root.
+      write: async (rawArgs) => {
+        const args = fileWriteArgsSchema.parse(rawArgs);
+        const written: string[] = [];
+        for (const { path, contents } of args.edits) {
+          const abs = resolveInsideRoot(projectRoot, path);
+          if (!abs) throw new Error(`Refusing to write ${path}: outside project root`);
+          await writeFile(abs, contents, 'utf8');
+          written.push(relative(projectRoot, abs));
+        }
+        return { written };
+      },
     },
     astEdit: {
       // Direct edit path used by the Design panel. Skips the AI turn — the
@@ -117,6 +132,8 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
             beforeHash: sha256(result.before),
             afterHash: sha256(result.after),
             diff: renderDiff(result.before, result.after),
+            before: result.before,
+            after: result.after,
           });
           applied += ops.length;
         }
@@ -179,6 +196,8 @@ function createToolExecutor(
         beforeHash: sha256(result.before),
         afterHash: sha256(result.after),
         diff: renderDiff(result.before, result.after),
+        before: result.before,
+        after: result.after,
       });
     },
   };
