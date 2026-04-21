@@ -2,6 +2,14 @@
 
 Production-quality foundations for an AI-assisted visual editor for React — a Dazl-like product built on the reverse-engineering in the parent workspace.
 
+## Who this is for
+
+**Design engineers.** People who live in JSX, Tailwind utility classes, and visual component structure. The tool reads DOM → fiber → source coordinates and writes back to `.tsx` files on disk, giving direct-manipulation control over layout, typography, color, spacing, and component composition.
+
+**Not for:** backend/full-stack work. The AST engine only understands JSX; it has no concept of API routes, database schemas, or server code. Reach for Cursor or a full-stack agent for that.
+
+**Closest peers in positioning:** Dazl, Tempo Labs, v0, Bolt, Figma Sites/Make — visual editors. Not Cursor, Aider, or codegen agents.
+
 ## Run
 
 ```bash
