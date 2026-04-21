@@ -13,6 +13,40 @@ A terse log of what changed each working session. Add an entry at the **top** ev
 
 ---
 
+## 2026-04-21 — `product-worker` subagent
+
+**Goal:** Create a project-level Claude Code agent that inherits all the architectural context, invariants, and scope filters needed to work on `/product` without reloading them every conversation.
+
+**Shipped:**
+- `/Users/daniel/Desktop/reverse-engineering/.claude/agents/product-worker.md` — full agent definition with:
+  - Audience filter (design engineers only)
+  - Monorepo layout (9 packages + responsibilities)
+  - Non-negotiable invariants (coord preservation, Zod boundaries, protocol-first, 1-indexed columns, sandboxed file I/O)
+  - UI3 design tokens table
+  - Workflow rules (SESSIONS.md prepending, build+test before done, dev server URLs, env management)
+  - Gotchas (no @vitejs/plugin-react, StrictMode WS, Vite `?t=` query, Radix Select popper)
+  - Deferred items list (validation loop, structural edits, state variants, Fast Refresh, multi-file, tokens, collab/publishing/auth)
+
+**How to invoke:** The main Claude Code agent will auto-delegate to `product-worker` for any task matching its description (code changes inside `/product`). The description explicitly rules out `/info` research and backend/full-stack work.
+
+**Gotcha:** The agent file's `description` field drives auto-delegation. Keep it specific about WHEN to use and WHEN NOT — that's what the dispatcher reads.
+
+---
+
+## 2026-04-21 — Audience locked: design engineers
+
+**Goal:** Make the product's audience explicit in the codebase so roadmap decisions stay aligned.
+
+**Shipped:**
+- `README.md` now opens with a "Who this is for" section: **design engineers** (JSX / Tailwind / visual composition). Explicitly out of scope: backend/API/DB work. Named the right peer set (Dazl, Tempo, v0, Bolt, Figma Sites/Make) and the wrong one (Cursor, Aider, full-stack agents) so positioning drift is self-correcting.
+- Cross-session memory record saved so future conversations evaluate feature requests through this lens.
+
+**Decision filter (new):** "Does this help a design engineer iterate faster on a visual surface?" If no, out of scope. This rules out ideas like "edit server code" or "understand API routes" while keeping the real roadmap (validation loop, structural edits, state variants, Fast Refresh) comfortably in-bounds.
+
+**Tests:** Unchanged. Documentation-only change.
+
+---
+
 ## 2026-04-21 — Simplify pass (review findings applied)
 
 **Goal:** Run three parallel reviewers (reuse / quality / efficiency) plus a UX-focused one over the smart-panel slice. Aggregate findings, fix the high-impact ones, defer scope-creep items.
