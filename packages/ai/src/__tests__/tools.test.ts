@@ -2,13 +2,21 @@ import { describe, it, expect } from 'vitest';
 import { toolSchemas, SYSTEM_PROMPT } from '../tools.js';
 
 describe('ai tools', () => {
-  it('exposes both first-slice tools', () => {
+  it('exposes the expected tool set', () => {
     const names = toolSchemas.map((t) => t.name);
-    expect(names).toEqual(['setJSXProp', 'updateJSXText']);
+    expect(names).toEqual([
+      'listFiles',
+      'readFile',
+      'findJSXElement',
+      'setJSXProp',
+      'updateJSXText',
+    ]);
   });
 
-  it('each tool declares source coords as required input', () => {
-    for (const tool of toolSchemas) {
+  it('edit tools declare source coords as required input', () => {
+    const editTools = toolSchemas.filter((t) => t.name === 'setJSXProp' || t.name === 'updateJSXText');
+    expect(editTools).toHaveLength(2);
+    for (const tool of editTools) {
       const schema = tool.input_schema as {
         required: string[];
         properties: Record<string, { required?: string[] }>;
@@ -22,8 +30,10 @@ describe('ai tools', () => {
     }
   });
 
-  it('system prompt mentions the tool discipline', () => {
+  it('system prompt mentions the tool discipline and design craft', () => {
     expect(SYSTEM_PROMPT).toMatch(/tools/i);
     expect(SYSTEM_PROMPT).toMatch(/source/i);
+    expect(SYSTEM_PROMPT).toMatch(/tailwind/i);
+    expect(SYSTEM_PROMPT).toMatch(/token/i);
   });
 });

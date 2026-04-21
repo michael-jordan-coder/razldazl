@@ -13,6 +13,9 @@
   "dependencies": {
     "@product/bridge": "workspace:*",
     "@product/protocol": "workspace:*",
+    "@radix-ui/react-popover": "^1.1.4",
+    "@radix-ui/react-select": "^2.1.4",
+    "@radix-ui/react-tooltip": "^1.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

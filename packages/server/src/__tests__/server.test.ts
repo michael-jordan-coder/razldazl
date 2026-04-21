@@ -10,31 +10,48 @@ import type Anthropic from '@anthropic-ai/sdk';
 // A stub that implements only what runTurn uses from the SDK. We fabricate a
 // response containing one setJSXProp tool_use block so the server's routing
 // can be exercised without hitting the network.
+// Two-turn stub: first turn emits a tool_use (setJSXProp); second turn
+// (after the tool result comes back) emits plain text and stops.
 function stubAnthropic(): Anthropic {
+  let calls = 0;
   return {
     messages: {
-      create: async () => ({
-        id: 'msg_stub',
-        type: 'message',
-        role: 'assistant',
-        model: 'claude-opus-4-7',
-        content: [
-          {
-            type: 'tool_use',
-            id: 'toolu_stub',
-            name: 'setJSXProp',
-            input: {
-              source: { fileName: 'App.tsx', lineNumber: 2, columnNumber: 5 },
-              prop: 'className',
-              value: 'touched',
-            },
-          },
-          { type: 'text', text: 'Updated the class name.' },
-        ],
-        stop_reason: 'end_turn',
-        stop_sequence: null,
-        usage: { input_tokens: 10, output_tokens: 5 },
-      }),
+      create: async () => {
+        calls++;
+        if (calls === 1) {
+          return {
+            id: 'msg_stub_1',
+            type: 'message',
+            role: 'assistant',
+            model: 'claude-opus-4-7',
+            content: [
+              {
+                type: 'tool_use',
+                id: 'toolu_stub',
+                name: 'setJSXProp',
+                input: {
+                  source: { fileName: 'App.tsx', lineNumber: 2, columnNumber: 5 },
+                  prop: 'className',
+                  value: 'touched',
+                },
+              },
+            ],
+            stop_reason: 'tool_use',
+            stop_sequence: null,
+            usage: { input_tokens: 10, output_tokens: 5 },
+          };
+        }
+        return {
+          id: 'msg_stub_2',
+          type: 'message',
+          role: 'assistant',
+          model: 'claude-opus-4-7',
+          content: [{ type: 'text', text: 'Updated the class name.' }],
+          stop_reason: 'end_turn',
+          stop_sequence: null,
+          usage: { input_tokens: 20, output_tokens: 5 },
+        };
+      },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

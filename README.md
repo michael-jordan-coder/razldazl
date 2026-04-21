@@ -55,6 +55,10 @@ pnpm --filter @product/ast-engine test
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for the system diagram and message flow through the full editor loop.
 
+## History
+
+See [SESSIONS.md](./SESSIONS.md) for a session-by-session changelog (goal, what shipped, what was deferred, test count, gotchas). Add an entry at the top every working session.
+
 ## Not yet
 
 First-slice deferrals (explicit): multi-file edits, CRDT/multi-user, publishing, auth, history, full tool catalog beyond `setJSXProp` + `updateJSXText`.

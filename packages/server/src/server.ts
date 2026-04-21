@@ -9,13 +9,13 @@
 //   Vite (on the demo-app side) observes the file change and HMRs
 //   preview-agent re-locks selection; editor-ui observes the new chat parts
 
-import { readFile } from 'node:fs/promises';
-import { resolve, isAbsolute, relative } from 'node:path';
+import { readFile, readdir } from 'node:fs/promises';
+import { resolve, isAbsolute, relative, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import Anthropic from '@anthropic-ai/sdk';
 import { createWSServer, type WSHandlers, type WSServer } from '@product/bridge/server';
-import { runTurn } from '@product/ai';
-import { editFile } from '@product/ast-engine';
+import { runTurn, type ToolExecutor } from '@product/ai';
+import { editFile, findJSXElements } from '@product/ast-engine';
 import {
   aiRunTurnArgsSchema,
   astEditApplyArgsSchema,
@@ -60,54 +60,21 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
 
         const emit = (p: ChatPart) => send('chat', p);
 
+        const executor = createToolExecutor(projectRoot, emit);
+
         const turn = await runTurn({
           client: anthropic,
           message: args.message,
           selectedSource: args.context.selectedSource,
           fileContents,
           onPart: emit,
+          executor,
         });
-
-        const byFile = groupOpsByFile(turn.toolCalls);
-
-        for (const [fileName, ops] of byFile) {
-          const abs = resolveInsideRoot(projectRoot, fileName);
-          if (!abs) {
-            emit({
-              kind: 'tool-call',
-              id: `reject-${fileName}`,
-              tool: 'setJSXProp',
-              args: {},
-              state: 'error',
-              error: `Refusing to edit ${fileName}: outside project root`,
-            });
-            continue;
-          }
-          try {
-            const result = await editFile(abs, ops);
-            emit({
-              kind: 'file-edit',
-              id: abs,
-              path: relative(projectRoot, abs),
-              beforeHash: sha256(result.before),
-              afterHash: sha256(result.after),
-              diff: renderDiff(result.before, result.after),
-            });
-          } catch (err) {
-            emit({
-              kind: 'tool-call',
-              id: `error-${fileName}`,
-              tool: 'setJSXProp',
-              args: { fileName },
-              state: 'error',
-              error: err instanceof Error ? err.message : String(err),
-            });
-          }
-        }
 
         return {
           toolCallCount: turn.toolCalls.length,
           finalText: turn.finalText,
+          iterations: turn.iterations,
         };
       },
     },
@@ -171,6 +138,70 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     port: ws.port,
     close: () => ws.close(),
   };
+}
+
+function createToolExecutor(
+  projectRoot: string,
+  emit: (p: ChatPart) => void,
+): ToolExecutor {
+  return {
+    async listFiles({ directory }) {
+      const base = directory
+        ? resolveInsideRoot(projectRoot, directory)
+        : projectRoot;
+      if (!base) throw new Error(`Refusing to list ${directory}: outside project root`);
+      return listReactFiles(projectRoot, base);
+    },
+    async readFile({ path }) {
+      const abs = resolveInsideRoot(projectRoot, path);
+      if (!abs) throw new Error(`Refusing to read ${path}: outside project root`);
+      return readFile(abs, 'utf8');
+    },
+    async findJSXElement({ path, tag, textContains, classContains }) {
+      const abs = resolveInsideRoot(projectRoot, path);
+      if (!abs) throw new Error(`Refusing to read ${path}: outside project root`);
+      const contents = await readFile(abs, 'utf8');
+      const query: { tag?: string; textContains?: string; classContains?: string } = {};
+      if (tag !== undefined) query.tag = tag;
+      if (textContains !== undefined) query.textContains = textContains;
+      if (classContains !== undefined) query.classContains = classContains;
+      return findJSXElements(contents, abs, query);
+    },
+    async applyEdit(op) {
+      const fileName = op.args.source.fileName;
+      const abs = resolveInsideRoot(projectRoot, fileName);
+      if (!abs) throw new Error(`Refusing to edit ${fileName}: outside project root`);
+      const result = await editFile(abs, [op]);
+      emit({
+        kind: 'file-edit',
+        id: `${abs}-${Date.now()}`,
+        path: relative(projectRoot, abs),
+        beforeHash: sha256(result.before),
+        afterHash: sha256(result.after),
+        diff: renderDiff(result.before, result.after),
+      });
+    },
+  };
+}
+
+async function listReactFiles(projectRoot: string, base: string): Promise<string[]> {
+  const out: string[] = [];
+  const SKIP = new Set(['node_modules', 'dist', '.turbo', '.git', '.vite', 'coverage']);
+  async function walk(dir: string): Promise<void> {
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const e of entries) {
+      if (e.name.startsWith('.') || SKIP.has(e.name)) continue;
+      const abs = join(dir, e.name);
+      if (e.isDirectory()) {
+        await walk(abs);
+      } else if (/\.(tsx|jsx)$/.test(e.name)) {
+        out.push(relative(projectRoot, abs));
+      }
+    }
+  }
+  await walk(base);
+  out.sort();
+  return out;
 }
 
 function groupOpsByFile(ops: ToolCall[]): Map<string, ToolCall[]> {

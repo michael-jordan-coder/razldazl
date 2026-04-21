@@ -70,8 +70,11 @@ describe('protocol schemas', () => {
     expect(
       previewToEditorSchema.parse({
         kind: 'selected',
-        source: { fileName: '/a.tsx', lineNumber: 1, columnNumber: 0 },
+        source: { fileName: '/a.tsx', lineNumber: 1, columnNumber: 1 },
         rect: { x: 0, y: 0, width: 10, height: 10 },
+        tag: 'div',
+        text: 'Hello',
+        className: null,
       }),
     ).toBeTruthy();
   });
