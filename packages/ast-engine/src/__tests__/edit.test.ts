@@ -15,7 +15,8 @@ describe('applyEdits — setJSXProp', () => {
       {
         tool: 'setJSXProp',
         args: {
-          source: { fileName: '/x.tsx', lineNumber: 3, columnNumber: 4 },
+          // columnNumber is 1-indexed (matches React's __source convention).
+          source: { fileName: '/x.tsx', lineNumber: 3, columnNumber: 5 },
           prop: 'className',
           value: 'px-2 text-xl',
         },
@@ -30,7 +31,7 @@ describe('applyEdits — setJSXProp', () => {
       {
         tool: 'setJSXProp',
         args: {
-          source: { fileName: '/x.tsx', lineNumber: 4, columnNumber: 4 },
+          source: { fileName: '/x.tsx', lineNumber: 4, columnNumber: 5 },
           prop: 'className',
           value: 'font-bold',
         },
@@ -61,7 +62,7 @@ describe('applyEdits — updateJSXText', () => {
       {
         tool: 'updateJSXText',
         args: {
-          source: { fileName: '/x.tsx', lineNumber: 3, columnNumber: 4 },
+          source: { fileName: '/x.tsx', lineNumber: 3, columnNumber: 5 },
           text: 'Subscribe',
         },
       },

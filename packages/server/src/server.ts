@@ -18,8 +18,10 @@ import { runTurn } from '@product/ai';
 import { editFile } from '@product/ast-engine';
 import {
   aiRunTurnArgsSchema,
+  astEditApplyArgsSchema,
   readFileArgsSchema,
   type ChatPart,
+  type ToolCall,
 } from '@product/protocol';
 
 export interface StartServerOptions {
@@ -66,14 +68,7 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
           onPart: emit,
         });
 
-        // Apply tool calls grouped by file.
-        const byFile = new Map<string, typeof turn.toolCalls>();
-        for (const call of turn.toolCalls) {
-          const fileName = call.args.source.fileName;
-          const list = byFile.get(fileName) ?? [];
-          list.push(call);
-          byFile.set(fileName, list);
-        }
+        const byFile = groupOpsByFile(turn.toolCalls);
 
         for (const [fileName, ops] of byFile) {
           const abs = resolveInsideRoot(projectRoot, fileName);
@@ -125,6 +120,42 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
         return { path: args.path, contents };
       },
     },
+    astEdit: {
+      // Direct edit path used by the Design panel. Skips the AI turn — the
+      // client has already decided which ops to run. Emits `file-edit` chat
+      // parts so the log still records what changed.
+      apply: async (rawArgs, { send }) => {
+        const args = astEditApplyArgsSchema.parse(rawArgs);
+        const emit = (p: ChatPart) => send('chat', p);
+        const byFile = groupOpsByFile(args.ops);
+        let applied = 0;
+        for (const [fileName, ops] of byFile) {
+          const abs = resolveInsideRoot(projectRoot, fileName);
+          if (!abs) {
+            emit({
+              kind: 'tool-call',
+              id: `reject-${fileName}`,
+              tool: ops[0]!.tool,
+              args: { fileName },
+              state: 'error',
+              error: `Refusing to edit ${fileName}: outside project root`,
+            });
+            continue;
+          }
+          const result = await editFile(abs, ops);
+          emit({
+            kind: 'file-edit',
+            id: abs,
+            path: relative(projectRoot, abs),
+            beforeHash: sha256(result.before),
+            afterHash: sha256(result.after),
+            diff: renderDiff(result.before, result.after),
+          });
+          applied += ops.length;
+        }
+        return { applied };
+      },
+    },
   };
 
   const ws: WSServer = await createWSServer({
@@ -142,8 +173,21 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
   };
 }
 
+function groupOpsByFile(ops: ToolCall[]): Map<string, ToolCall[]> {
+  const byFile = new Map<string, ToolCall[]>();
+  for (const op of ops) {
+    const fileName = op.args.source.fileName;
+    const list = byFile.get(fileName) ?? [];
+    list.push(op);
+    byFile.set(fileName, list);
+  }
+  return byFile;
+}
+
 function resolveInsideRoot(root: string, requested: string): string | null {
-  const abs = isAbsolute(requested) ? requested : resolve(root, requested);
+  // Vite dev URLs include a cache-buster query like "?t=173...". Strip it.
+  const clean = requested.split('?')[0]!.split('#')[0]!;
+  const abs = isAbsolute(clean) ? clean : resolve(root, clean);
   const rel = relative(root, abs);
   if (rel.startsWith('..') || isAbsolute(rel)) return null;
   return abs;

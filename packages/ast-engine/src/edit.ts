@@ -82,12 +82,15 @@ function applyOp(ast: t.File, op: ToolCall): void {
 }
 
 function findJSXElement(ast: t.File, source: JSXSource): t.JSXElement {
+  // React's JSX dev transform emits `columnNumber` as Babel's 0-indexed column
+  // plus one. We undo that here so our match is 0-indexed-vs-0-indexed.
+  const targetCol0 = source.columnNumber - 1;
   let found: t.JSXElement | null = null;
   traverse(ast, {
     JSXElement(path) {
       const loc = path.node.openingElement.loc ?? path.node.loc;
       if (!loc) return;
-      if (loc.start.line === source.lineNumber && loc.start.column === source.columnNumber) {
+      if (loc.start.line === source.lineNumber && loc.start.column === targetCol0) {
         found = path.node;
         path.stop();
       }

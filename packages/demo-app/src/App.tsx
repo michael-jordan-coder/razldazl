@@ -1,15 +1,12 @@
 export const App = () => {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center p-8">
-      <section className="max-w-md w-full bg-white rounded-lg shadow p-6 space-y-4">
-        <h1 className="text-2xl font-semibold">Welcome</h1>
-        <p className="text-slate-600">
-          This is a sample React app. Click any element in the editor preview
-          to select it, then describe a change in natural language.
-        </p>
+      <section className="min-h-screen bg-neutral-100 text-slate-100 flex flex-col items-center justify-center p-8 gap-4 rounded-lg">
+        <h1 className="text-3xl font-semibold px-8">Welcome dog</h1>
+        <p className="text-rose-500">fuckkkk</p>
         <div className="flex gap-2 pt-2">
           <button className="px-3 py-2 rounded bg-slate-900 text-white text-sm">Primary</button>
-          <button className="px-3 py-2 rounded border border-slate-300 text-sm">Secondary</button>
+          <button className="px-3 py-2 rounded border border-slate-300 text-rose-500 bg-blue-500 text-xl">Secondary</button>
         </div>
       </section>
     </main>

@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import { PreviewPane } from './PreviewPane.js';
 import { Sidebar } from './Sidebar.js';
+import { DesignPanel } from './DesignPanel.js';
 import { useSelection } from './useSelection.js';
 import { useWS } from './useWS.js';
-import type { ChatPart } from '@product/protocol';
+import type { ChatPart, ToolCall } from '@product/protocol';
 
 export const App = () => {
   const selectionApi = useSelection();
   const ws = useWS();
   const [sending, setSending] = useState(false);
+  const [applying, setApplying] = useState(false);
 
   // After a file edit, nudge the preview to re-lock the currently selected
   // element by its source. HMR will normally have fired by the time this
@@ -25,6 +27,21 @@ export const App = () => {
     }
     return;
   }, [ws.chatParts, selectionApi]);
+
+  const onApplyEdit = async (ops: ToolCall[]) => {
+    if (!ws.client || !ws.ready) return;
+    setApplying(true);
+    try {
+      await ws.client.call('astEdit', 'apply', { ops });
+      if (selectionApi.selection) {
+        setTimeout(() => {
+          selectionApi.relock(selectionApi.selection!.source);
+        }, 150);
+      }
+    } finally {
+      setApplying(false);
+    }
+  };
 
   const onSend = async (message: string) => {
     if (!ws.client || !ws.ready) return;
@@ -46,9 +63,6 @@ export const App = () => {
 
   return (
     <div className="flex h-full bg-slate-950 text-slate-100">
-      <div className="flex-1 relative">
-        <PreviewPane iframeRef={selectionApi.iframeRef} selection={selectionApi.selection} />
-      </div>
       <Sidebar
         connected={ws.ready}
         previewReady={selectionApi.previewReady}
@@ -60,6 +74,14 @@ export const App = () => {
           selectionApi.clear();
           ws.clearChat();
         }}
+      />
+      <div className="flex-1 relative">
+        <PreviewPane iframeRef={selectionApi.iframeRef} selection={selectionApi.selection} />
+      </div>
+      <DesignPanel
+        selection={selectionApi.selection}
+        applying={applying}
+        onApply={onApplyEdit}
       />
     </div>
   );

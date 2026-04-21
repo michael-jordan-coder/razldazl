@@ -136,6 +136,9 @@ export const previewToEditorSchema = z.discriminatedUnion('kind', [
       width: z.number(),
       height: z.number(),
     }),
+    tag: z.string(),
+    text: z.string().nullable(),
+    className: z.string().nullable(),
   }),
   z.object({
     kind: z.literal('cleared'),
@@ -180,3 +183,13 @@ export const readFileResultSchema = z.object({
   path: z.string(),
   contents: z.string(),
 });
+
+// ---------------------------------------------------------------------------
+// Direct AST-edit API — editor-ui → server. Used by the Design panel to apply
+// a concrete edit without going through the AI turn loop.
+// ---------------------------------------------------------------------------
+
+export const astEditApplyArgsSchema = z.object({
+  ops: z.array(toolCallSchema).min(1),
+});
+export type AstEditApplyArgs = z.infer<typeof astEditApplyArgsSchema>;

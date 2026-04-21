@@ -39,7 +39,9 @@ function collectJSXLocs(source: string): Loc[] {
       if (name.type === 'JSXIdentifier') tag = name.name;
       else if (name.type === 'JSXMemberExpression') tag = 'member';
       else if (name.type === 'JSXNamespacedName') tag = 'ns';
-      locs.push({ line: loc.start.line, column: loc.start.column, tag });
+      // Report column as 1-indexed to match JSXSource convention used by the
+      // edit engine and AI tools.
+      locs.push({ line: loc.start.line, column: loc.start.column + 1, tag });
     },
   });
   return locs;

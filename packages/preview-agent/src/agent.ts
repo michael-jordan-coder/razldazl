@@ -35,21 +35,13 @@ export function initAgent(): AgentHandle {
 
   const onClick = (ev: MouseEvent) => {
     if (!(ev.target instanceof Element)) return;
-    // Only hijack clicks when the editor is driving — detect via
-    // `__product_agent_active` set by the handshake from the editor. For
-    // first slice, hijack always.
     ev.preventDefault();
     ev.stopPropagation();
     const source = findSourceForNode(ev.target);
     if (!source) return;
     currentSource = source;
     placeOverlay(overlay, ev.target);
-    const rect = ev.target.getBoundingClientRect();
-    send({
-      kind: 'selected',
-      source,
-      rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-    });
+    send(buildSelectedMessage(ev.target, source));
   };
 
   const onMessage = (ev: MessageEvent) => {
@@ -74,12 +66,7 @@ export function initAgent(): AgentHandle {
         return;
       }
       placeOverlay(overlay, node);
-      const rect = node.getBoundingClientRect();
-      send({
-        kind: 'selected',
-        source: msg.source,
-        rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-      });
+      send(buildSelectedMessage(node, msg.source));
     }
   };
 
@@ -103,12 +90,7 @@ export function initAgent(): AgentHandle {
           return;
         }
         placeOverlay(overlay, node);
-        const rect = node.getBoundingClientRect();
-        send({
-          kind: 'selected',
-          source: currentSource!,
-          rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-        });
+        send(buildSelectedMessage(node, currentSource!));
         send({ kind: 'rerendered' });
       });
     });
@@ -123,6 +105,29 @@ export function initAgent(): AgentHandle {
       overlay.remove();
     },
   };
+}
+
+function buildSelectedMessage(node: Element, source: JSXSource): PreviewToEditor {
+  const rect = node.getBoundingClientRect();
+  return {
+    kind: 'selected',
+    source,
+    rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+    tag: node.tagName.toLowerCase(),
+    text: extractTextContent(node),
+    className: node.getAttribute('class'),
+  };
+}
+
+// If every child is a text node, return the concatenated text; otherwise
+// null (the element has structural children and text editing would drop them).
+function extractTextContent(node: Element): string | null {
+  if (node.childNodes.length === 0) return '';
+  for (let i = 0; i < node.childNodes.length; i++) {
+    const child = node.childNodes[i]!;
+    if (child.nodeType !== Node.TEXT_NODE) return null;
+  }
+  return node.textContent ?? '';
 }
 
 function ensureOverlay(): HTMLDivElement {

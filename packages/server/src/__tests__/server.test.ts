@@ -24,7 +24,7 @@ function stubAnthropic(): Anthropic {
             id: 'toolu_stub',
             name: 'setJSXProp',
             input: {
-              source: { fileName: 'App.tsx', lineNumber: 2, columnNumber: 4 },
+              source: { fileName: 'App.tsx', lineNumber: 2, columnNumber: 5 },
               prop: 'className',
               value: 'touched',
             },
@@ -77,7 +77,7 @@ describe('startServer — end-to-end routing (stubbed LLM)', () => {
     const result = await client.call<{ toolCallCount: number }>('ai', 'runTurn', {
       message: 'make it touched',
       context: {
-        selectedSource: { fileName: 'App.tsx', lineNumber: 2, columnNumber: 4 },
+        selectedSource: { fileName: 'App.tsx', lineNumber: 2, columnNumber: 5 },
       },
     });
     expect(result.toolCallCount).toBe(1);

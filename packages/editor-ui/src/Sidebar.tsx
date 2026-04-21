@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import type { ChatPart } from '@product/protocol';
 import type { Selection } from './useSelection.js';
+// Selection source info is already shown in the Design panel on the right,
+// so the sidebar drops the "Selected" section to stay focused on chat.
 
 export interface SidebarProps {
   connected: boolean;
@@ -21,6 +23,7 @@ export const Sidebar = ({
   onSend,
   onClear,
 }: SidebarProps) => {
+  void selection;
   const [message, setMessage] = useState('');
 
   const submit = (e: FormEvent) => {
@@ -32,7 +35,7 @@ export const Sidebar = ({
   };
 
   return (
-    <aside className="w-96 flex flex-col border-l border-slate-800 bg-slate-900">
+    <aside className="w-96 flex flex-col border-r border-slate-800 bg-slate-900">
       <header className="flex items-center justify-between border-b border-slate-800 p-3 text-xs text-slate-400">
         <div className="flex items-center gap-2">
           <span
@@ -53,19 +56,6 @@ export const Sidebar = ({
           clear
         </button>
       </header>
-
-      <section className="border-b border-slate-800 p-3 text-sm">
-        <div className="mb-1 text-xs uppercase tracking-wide text-slate-500">Selected</div>
-        {selection ? (
-          <code className="block whitespace-pre-wrap break-all text-xs text-slate-200">
-            {selection.source.fileName}
-            {'\n'}
-            line {selection.source.lineNumber}, col {selection.source.columnNumber}
-          </code>
-        ) : (
-          <div className="text-xs text-slate-500">Click an element in the preview.</div>
-        )}
-      </section>
 
       <section className="flex-1 overflow-y-auto p-3 text-sm">
         <ul className="space-y-2">

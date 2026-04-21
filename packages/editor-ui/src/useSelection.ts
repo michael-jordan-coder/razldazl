@@ -5,6 +5,9 @@ import { PREVIEW_URL } from './config.js';
 export interface Selection {
   source: JSXSource;
   rect: { x: number; y: number; width: number; height: number };
+  tag: string;
+  text: string | null;
+  className: string | null;
 }
 
 export function useSelection(): {
@@ -25,7 +28,14 @@ export function useSelection(): {
       if (!parsed.success) return;
       const msg = parsed.data;
       if (msg.kind === 'ready') setPreviewReady(true);
-      else if (msg.kind === 'selected') setSelection({ source: msg.source, rect: msg.rect });
+      else if (msg.kind === 'selected')
+        setSelection({
+          source: msg.source,
+          rect: msg.rect,
+          tag: msg.tag,
+          text: msg.text,
+          className: msg.className,
+        });
       else if (msg.kind === 'cleared') setSelection(null);
     };
     window.addEventListener('message', onMessage);
