@@ -26,6 +26,7 @@ const OVERLAY_ID = '__product_agent_overlay';
 export function initAgent(): AgentHandle {
   const overlay = ensureOverlay();
   let currentSource: JSXSource | null = null;
+  let mode: 'edit' | 'preview' = 'edit';
 
   const send = (msg: PreviewToEditor) => {
     const parsed = previewToEditorSchema.safeParse(msg);
@@ -34,6 +35,7 @@ export function initAgent(): AgentHandle {
   };
 
   const onClick = (ev: MouseEvent) => {
+    if (mode !== 'edit') return;
     if (!(ev.target instanceof Element)) return;
     ev.preventDefault();
     ev.stopPropagation();
@@ -55,6 +57,18 @@ export function initAgent(): AgentHandle {
       currentSource = null;
       hideOverlay(overlay);
       send({ kind: 'cleared' });
+      return;
+    }
+    if (msg.kind === 'mode') {
+      mode = msg.mode;
+      if (mode === 'preview') {
+        // Hide the overlay but keep currentSource so entering edit again
+        // can re-lock the last selection.
+        hideOverlay(overlay);
+      } else if (currentSource) {
+        const node = findNodeForSource(currentSource);
+        if (node) placeOverlay(overlay, node);
+      }
       return;
     }
     if (msg.kind === 'relock') {

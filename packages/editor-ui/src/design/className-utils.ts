@@ -1,7 +1,11 @@
-// Small helpers for reading and mutating className strings. The panel uses
-// these to find the "current" value of a group (e.g. the current bg-*-* class
-// so the color picker can highlight it) and to swap one token for another
+// Helpers for reading and mutating className strings. The panel uses these
+// to find the "current" value of a group (e.g. the current bg-*-* class so
+// the color picker can highlight it) and to swap one token for another
 // without disturbing siblings.
+//
+// Unparametrized patterns live as module-scope constants so each render
+// reuses a single RegExp instance per group (avoids compiling ~25 regexes
+// on every DesignPanel render).
 
 export function classList(className: string | null | undefined): string[] {
   return (className ?? '').split(/\s+/).filter(Boolean);
@@ -11,7 +15,6 @@ export function hasClass(className: string | null | undefined, cls: string): boo
   return classList(className).includes(cls);
 }
 
-/** Find the first class matching a regex. Returns null if none. */
 export function findClass(className: string | null | undefined, pattern: RegExp): string | null {
   for (const c of classList(className)) {
     if (pattern.test(c)) return c;
@@ -19,7 +22,6 @@ export function findClass(className: string | null | undefined, pattern: RegExp)
   return null;
 }
 
-/** Remove all classes matching a regex. */
 export function removeClasses(className: string | null | undefined, pattern: RegExp): string {
   return classList(className)
     .filter((c) => !pattern.test(c))
@@ -27,53 +29,92 @@ export function removeClasses(className: string | null | undefined, pattern: Reg
 }
 
 /**
- * Replace any class in a group with `next`. If `next` is null, just remove
- * the group. Keeps order stable — appends to the end if the group wasn't
- * present before.
+ * Replace any class matching `pattern` with `next`. If `next` is null or
+ * empty, just strip the group. If `next` is already present outside the
+ * group, dedupe. Runs a single classList split per call.
  */
 export function replaceGroup(
   className: string | null | undefined,
   pattern: RegExp,
   next: string | null,
 ): string {
-  const list = classList(className);
-  const withoutGroup = list.filter((c) => !pattern.test(c));
-  if (next === null || next === '') return withoutGroup.join(' ');
-  const stillIncludes = list.some((c) => c === next);
-  return stillIncludes ? withoutGroup.concat(next).join(' ') : withoutGroup.concat(next).join(' ');
+  const withoutGroup = classList(className).filter((c) => !pattern.test(c));
+  if (!next) return withoutGroup.join(' ');
+  if (withoutGroup.includes(next)) return withoutGroup.join(' ');
+  return [...withoutGroup, next].join(' ');
 }
 
-/**
- * For spacing scales like p-*, px-*, py-*, gap-*, we match the *-{stepValue}
- * form. stepValue can be a number or a decimal like "0.5", "1.5".
- */
-export function spacingGroupPattern(prefix: string): RegExp {
-  // Matches e.g. `px-0`, `px-0.5`, `px-2.5`, `px-12`.
-  return new RegExp(`^${escapeRegex(prefix)}-(?:\\d+(?:\\.\\d+)?|px)$`);
-}
+// --- Constant patterns (unparametrized) -----------------------------------
+
+export const TEXT_SIZE_PATTERN =
+  /^text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)$/;
+
+export const FONT_WEIGHT_PATTERN =
+  /^font-(thin|extralight|light|normal|medium|semibold|bold|extrabold|black)$/;
+
+export const RADIUS_PATTERN = /^rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full))?$/;
+
+export const FLEX_DIRECTION_PATTERN = /^flex-(row|col)(-reverse)?$/;
+
+export const ALIGN_ITEMS_PATTERN = /^items-(start|center|end|stretch|baseline)$/;
+
+export const JUSTIFY_CONTENT_PATTERN =
+  /^justify-(start|center|end|between|around|evenly)$/;
+
+// Explicit whitelist — cannot collide with text-{size} (text-sm) or
+// text-{color}-{shade} (text-blue-600).
+export const TEXT_ALIGN_PATTERN = /^text-(left|center|right|justify)$/;
+
+export const DISPLAY_MODE_PATTERN = /^(flex|grid)$/;
+
+// Back-compat accessors so existing call sites don't churn.
+export const textSizePattern = (): RegExp => TEXT_SIZE_PATTERN;
+export const fontWeightPattern = (): RegExp => FONT_WEIGHT_PATTERN;
+export const radiusPattern = (): RegExp => RADIUS_PATTERN;
+export const flexDirectionPattern = (): RegExp => FLEX_DIRECTION_PATTERN;
+export const alignItemsPattern = (): RegExp => ALIGN_ITEMS_PATTERN;
+export const justifyContentPattern = (): RegExp => JUSTIFY_CONTENT_PATTERN;
+export const textAlignPattern = (): RegExp => TEXT_ALIGN_PATTERN;
+
+// --- Parametrized patterns ------------------------------------------------
+
+const COLOR_PATTERNS: Record<'bg' | 'text' | 'border', RegExp> = {
+  bg: /^bg-[a-z]+-\d+$/,
+  text: /^text-[a-z]+-\d+$/,
+  border: /^border-[a-z]+-\d+$/,
+};
 
 export function colorGroupPattern(prefix: 'bg' | 'text' | 'border'): RegExp {
-  // Matches e.g. `bg-slate-500`, `text-blue-600`, `border-red-300`.
-  return new RegExp(`^${prefix}-[a-z]+-\\d+$`);
+  return COLOR_PATTERNS[prefix];
 }
 
-export function textSizePattern(): RegExp {
-  return /^text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)$/;
-}
+const SPACING_PATTERN_CACHE = new Map<string, RegExp>();
 
-export function fontWeightPattern(): RegExp {
-  return /^font-(thin|extralight|light|normal|medium|semibold|bold|extrabold|black)$/;
-}
-
-export function radiusPattern(): RegExp {
-  return /^rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full))?$/;
+export function spacingGroupPattern(prefix: string): RegExp {
+  let pat = SPACING_PATTERN_CACHE.get(prefix);
+  if (!pat) {
+    pat = new RegExp(`^${escapeRegex(prefix)}-(?:\\d+(?:\\.\\d+)?|px)$`);
+    SPACING_PATTERN_CACHE.set(prefix, pat);
+  }
+  return pat;
 }
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** Human-readable spacing step label, e.g. 2 → "2 (8px)", 0.5 → "0.5 (2px)". */
+/** True if the element has `flex` or `grid` in its className. */
+export function isFlexContainer(className: string | null | undefined): boolean {
+  return hasClass(className, 'flex') || hasClass(className, 'grid');
+}
+
+/** Returns which display mode is active, if any. */
+export function displayMode(className: string | null | undefined): 'flex' | 'grid' | null {
+  if (hasClass(className, 'flex')) return 'flex';
+  if (hasClass(className, 'grid')) return 'grid';
+  return null;
+}
+
 export function spacingLabel(step: number): string {
   return `${step} · ${step * 4}px`;
 }

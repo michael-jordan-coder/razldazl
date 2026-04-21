@@ -13,6 +13,114 @@ A terse log of what changed each working session. Add an entry at the **top** ev
 
 ---
 
+## 2026-04-21 — Simplify pass (review findings applied)
+
+**Goal:** Run three parallel reviewers (reuse / quality / efficiency) plus a UX-focused one over the smart-panel slice. Aggregate findings, fix the high-impact ones, defer scope-creep items.
+
+**Shipped — performance:**
+- All unparametrized RegExp generators promoted to module-scope constants in `packages/editor-ui/src/design/className-utils.ts` (`TEXT_SIZE_PATTERN`, `FONT_WEIGHT_PATTERN`, `RADIUS_PATTERN`, `FLEX_DIRECTION_PATTERN`, `ALIGN_ITEMS_PATTERN`, `JUSTIFY_CONTENT_PATTERN`, `TEXT_ALIGN_PATTERN`, `DISPLAY_MODE_PATTERN`). Per DesignPanel render: **~25 RegExp allocs → 0**. Back-compat function-style accessors (`textSizePattern()` etc.) retained so nothing else had to change.
+- `colorGroupPattern` now looks up a pre-baked `COLOR_PATTERNS` record; `spacingGroupPattern` uses a `Map<string, RegExp>` cache.
+- `replaceGroup` simplified: single `classList` split, dead duplicate-return branch removed.
+
+**Shipped — quality:**
+- Redundant `liveClass = classNameDraft` alias removed from `DesignPanel.tsx`; `classNameDraft` passed to sections directly. `SectionProps` field count 11→9.
+- New `design/primitives/LabeledField.tsx` — deduped `Field` and `LabeledRow` that were separately defined in `sections.tsx` and `LayoutPicker.tsx`.
+- `SpacingRow` helper inside `sections.tsx` collapses `PaddingSection`'s two near-identical Scrubbers and `GapSection`'s third copy into one parameterized component.
+- `tailwind-palette.ts` arrays typed as `readonly SegItem<K>[]` so `LayoutPicker` and `AlignPicker` no longer need `as readonly SegItem<K>[] as SegItem<K>[]` double casts.
+- `useEffect` dependency in DesignPanel pruned from `[selectionKey, selection?.className, selection?.text]` to `[selectionKey]`.
+- `LayoutPicker` uses `classList(liveClass)` instead of hand-rolled `split(/\s+/).filter(Boolean)`.
+
+**Shipped — UX refinements (high-impact from reviewer):**
+- **Scrubber full-row drag.** Whole 24px row is now the drag surface (previously just the 24px icon prefix). Input element excluded from drag via `closest('input')` check. Added `role="spinbutton"` + `aria-valuenow` + `aria-label`.
+- **Layout section redesigned as `[Flex] [Grid] [Off]` segmented switch.** Replaces the "Enable Flex" button + "disable layout" text link. Grid is now first-class. `DISPLAY_MODES` constant + `displayMode()` helper in `className-utils.ts`. Direction row only in flex mode; align/justify in both flex and grid; block mode clears all of them.
+
+**Deferred (called out by reviewers, intentionally not done here):**
+- Text-content unsaved-edits lost when selection changes mid-typing. Real bug but outside simplify scope.
+- Inline shade preview in ColorPicker trigger — reviewer's suggestion, but trigger already shows a 14px `Swatch` before the class name. No-op.
+- `<div role="button">` → button role detection. Requires preview-agent sending `role` attr.
+- `<a>` without children defaulting to text role — minor heuristic tweak, defer.
+- 3×3 Figma align-grid — panel is 260px wide; single-row segmented controls are the right fit. Revisit if width grows.
+- Section collapsing — not needed at current section count.
+- Stringly-typed `'flex'` / `'grid'` string literals in `LayoutPicker` — acceptable given the CSS spec uses these; no magic strings elsewhere.
+
+**Tests:** 35/35 passing. Build clean on all 9 packages. Dev boots as before.
+
+**Gotchas:**
+- Promoted patterns kept back-compat function accessors (`textSizePattern = () => TEXT_SIZE_PATTERN`) so existing import sites resolve. New code should use the constant directly.
+- `DISPLAY_MODES` exposes a `block` option — writing "block" to className would be wrong (you'd want no flex/grid at all). Handled by `LayoutPicker.setMode` stripping flex/grid without adding anything when mode === 'block'.
+- `SpacingRow` passes the constructed `spacingGroupPattern(prefix)` into both the `findClass` call and the `replaceGroup` call — the pattern is cached in the module-level Map so repeated lookups are O(1).
+
+---
+
+## 2026-04-21 — Smart role-based Design panel + Layout/Align
+
+**Goal:** Panel reshapes per element role (text / button / input / image / container / fallback) — show only relevant sections. Added Layout (flex direction / align / justify) for containers and Text align for text.
+
+**Shipped:**
+- `packages/editor-ui/src/design/role.ts` — `Role` type, `roleOf(selection)` heuristic over `tag + text + className`, `ROLE_SECTIONS` map (ordered `SectionId[]` per role), `ROLE_LABEL` for the panel subtitle badge.
+- `packages/editor-ui/src/design/primitives/SegmentedControl.tsx` (new) — extracted from `Toolbar.tsx`'s `ModeSwitch`. Generic over value type `<V extends string>`, flex-1 segments so it can fill a field width. Reused for: Edit/Preview toggle in Toolbar, Flex direction, Align-items, Justify-content, Text-align.
+- `packages/editor-ui/src/design/tailwind-palette.ts` — added `FLEX_DIRECTIONS` (4), `ALIGN_ITEMS` (5), `JUSTIFY_CONTENT` (6), `TEXT_ALIGNS` (4). Each entry: `{ key, label, title }` with Unicode direction glyphs for labels.
+- `packages/editor-ui/src/design/className-utils.ts` — added `flexDirectionPattern`, `alignItemsPattern`, `justifyContentPattern`, `textAlignPattern`, `isFlexContainer(className)`.
+- `packages/editor-ui/src/design/LayoutPicker.tsx` — three `SegmentedControl` rows inside a labeled field layout. Shows `+ Enable Flex` button when `flex`/`grid` isn't present; once enabled, offers `disable layout` to strip all flex classes cleanly.
+- `packages/editor-ui/src/design/AlignPicker.tsx` — single `SegmentedControl` for text-align.
+- `packages/editor-ui/src/design/sections.tsx` — one file of 10 named section components (`ElementSection`, `ContentSection`, `TypographySection`, `TextAlignSection`, `FillSection`, `ShapeSection`, `LayoutSection`, `PaddingSection`, `GapSection`, `ClassesSection`) all sharing a `SectionProps` interface.
+- `packages/editor-ui/src/DesignPanel.tsx` rewrite — iterates `ROLE_SECTIONS[role]` and dispatches through a `SECTION_RENDER` map. Panel header now shows the detected role as a subtle uppercase badge in the top-right of the header. State management (`classNameDraft`, `text`, `selectionKey` effect) and `setClassName` path are identical to before.
+- `packages/editor-ui/src/Toolbar.tsx` — swapped inline `SegmentButton` for the shared `SegmentedControl` (pixel-identical).
+
+**Role → sections map:**
+
+| Role | Sections |
+|---|---|
+| text | Element · Content · Typography · Text align · Classes |
+| button | Element · Content · Typography · Fill · Shape · Padding · Classes |
+| input | Element · Fill · Shape · Typography · Padding · Classes |
+| image | Element · Fill · Shape · Classes |
+| container | Element · Fill · Shape · Layout · Padding · Gap · Classes |
+| fallback | Element · Fill · Shape · Padding · Classes |
+
+**Deferred:**
+- State variants (hover / focus / disabled) — next slice.
+- Image controls (object-fit, aspect-ratio, src/alt).
+- Input-specific affordances (type, placeholder editing).
+- 3×3 Figma-style align grid (kept single rows for 260px panel width).
+- React component role introspection (preview-agent only sends HTML tag name, lowercase).
+
+**Tests:** 35/35 passing. Build clean on all 9 packages.
+
+**Gotchas:**
+- `textAlignPattern` is an explicit whitelist (`^text-(left|center|right|justify)$`) so it doesn't collide with `text-sm` (size) or `text-blue-600` (color).
+- `LayoutPicker` differentiates "no flex class" from "flex is disabled" — the "Enable Flex" button appends `flex` without touching other classes; "disable layout" strips `flex`/`grid` AND all direction/align/justify classes so the element cleanly returns to block flow.
+- Role detection is heuristic and UI-only: `<Button>` (custom component) renders as `<button>` at runtime and classifies as button. A `<div>` wrapping only text classifies as container (designers can select the inner text node or use the Classes field if typography is needed).
+- Section components all consume the same `SectionProps` interface so the panel can render them via a `Record<SectionId, Component>` dispatch map. Adding a new section is literally one file + one map entry.
+
+---
+
+## 2026-04-21 — Edit / Preview mode switch
+
+**Goal:** A top toolbar with a segmented Edit/Preview control. Edit = today's behavior. Preview = panels hide, iframe expands full-width, click interception disabled so the demo app is fully interactive.
+
+**Shipped:**
+- `@product/protocol`: new `mode` message in `editorToPreviewSchema` (`{kind: 'mode', mode: 'edit' | 'preview'}`).
+- `@product/preview-agent`: gates click interception on `mode === 'edit'`. When switching to preview, overlay hides but `currentSource` is retained so switching back re-places the ring. When switching back to edit with a prior selection, overlay is restored without a round-trip.
+- `packages/editor-ui/src/Toolbar.tsx` (new) — 40px top bar: status chips (connected / preview) on the left, [Edit | Preview] segmented control centered, a placeholder 100% on the right for future zoom/device presets. UI3-styled: 2px padding around the segmented group, active segment has the `--ui-bg` surface + 0.5px border ring.
+- `editor-ui/src/useSelection.ts` — added `setMode(mode)` that posts to the iframe.
+- `editor-ui/src/App.tsx` — mode state, syncs to the agent via useEffect (including on previewReady, so HMR reloads restore the mode). Panels are conditionally rendered; preview mode drops Sidebar + DesignPanel entirely so iframe takes the full width. `V` toggles mode (when not typing); `Escape` exits Preview.
+
+**Deferred:**
+- Per-panel minimize icons in the toolbar (UI3's two-rect toggle on each side). Next slice; lets the user hide one panel while in Edit.
+- Animated panel collapse (currently mount/unmount — no slide animation).
+- Zoom control (the 100% on the right is a placeholder).
+- Device/breakpoint presets (mobile / tablet / desktop widths for the iframe).
+
+**Tests:** 35 passing.
+
+**Gotchas:**
+- Mode is synced to the iframe on every `previewReady` change too — otherwise a refresh of the demo-app would lose the mode setting since the agent re-initializes.
+- Preview mode passes `selection={null}` to `PreviewPane` so the overlay box disappears. The actual selection state is preserved in `useSelection`, so returning to Edit restores the box.
+- `V` hotkey is disabled when the user is typing (checks `INPUT` / `TEXTAREA` / `contentEditable`). `Escape` always exits preview since there's no other conflict.
+
+---
+
 ## 2026-04-21 — UI3 visual system (Figma-style panels)
 
 **Goal:** Restyle both panels (Sidebar + DesignPanel) to Figma UI3's visual language — dense, dark, 11px body text, 24px input rows, 5px radius, Figma-blue (#0d99ff) accent, subtle borders.

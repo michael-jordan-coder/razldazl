@@ -1,6 +1,9 @@
 // UI3-style numeric input with a letter-icon prefix on the left and the
-// value right-aligned. Horizontal pointer drag on the icon scrubs through
-// the scale — Figma behavior. Double-click to type. Arrow keys step.
+// value right-aligned. The WHOLE row is a drag surface — horizontal pointer
+// drag scrubs through the scale. Double-click the value to type. Arrow keys
+// step.
+//
+// Pointer-down on the value <input> is excluded from drag so typing works.
 
 import { useEffect, useRef, useState } from 'react';
 
@@ -59,8 +62,10 @@ export const Scrubber = ({
     };
   }, [dragFrom, dragIndex, onCommit, pxPerStep, scale]);
 
-  const onPointerDown = (e: React.PointerEvent) => {
+  const onRowPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (disabled) return;
+    // Let the typing input receive clicks normally.
+    if ((e.target as HTMLElement).closest('input')) return;
     e.preventDefault();
     const startIndex = valueIndex ?? 0;
     setDragFrom({ x: e.clientX, startIndex });
@@ -70,7 +75,12 @@ export const Scrubber = ({
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (disabled) return;
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown')
+    if (
+      e.key !== 'ArrowLeft' &&
+      e.key !== 'ArrowRight' &&
+      e.key !== 'ArrowUp' &&
+      e.key !== 'ArrowDown'
+    )
       return;
     e.preventDefault();
     const cur = valueIndex ?? 0;
@@ -96,31 +106,32 @@ export const Scrubber = ({
   return (
     <div
       ref={rootRef}
-      className="flex h-6 w-full items-center rounded-[5px] text-[11px] leading-[16px] tracking-[0.055px]"
+      role="spinbutton"
+      aria-label={label}
+      aria-valuenow={value ?? undefined}
+      tabIndex={disabled ? -1 : 0}
+      onPointerDown={onRowPointerDown}
+      onKeyDown={onKeyDown}
+      onDoubleClick={() => {
+        if (disabled) return;
+        setTyping(value !== null ? String(value) : '');
+      }}
+      className="flex h-6 w-full cursor-ew-resize items-center rounded-[5px] text-[11px] leading-[16px] tracking-[0.055px] select-none"
       style={{
         background: 'var(--ui-bg-input)',
         color: 'var(--ui-text)',
         opacity: disabled ? 0.4 : 1,
+        cursor: disabled ? 'not-allowed' : 'ew-resize',
       }}
       title={label}
-      onDoubleClick={(e) => {
-        if (disabled) return;
-        if (e.target !== e.currentTarget && (e.target as HTMLElement).tagName === 'INPUT') return;
-        setTyping(value !== null ? String(value) : '');
-      }}
     >
-      <button
-        type="button"
-        className="flex h-6 w-6 shrink-0 cursor-ew-resize items-center justify-center select-none"
+      <span
+        aria-hidden="true"
+        className="flex h-6 w-6 shrink-0 items-center justify-center"
         style={{ color: 'var(--ui-text-secondary)' }}
-        onPointerDown={onPointerDown}
-        onKeyDown={onKeyDown}
-        disabled={disabled}
-        tabIndex={0}
-        aria-label={label}
       >
         {iconLabel}
-      </button>
+      </span>
       {typing !== null ? (
         <input
           autoFocus
@@ -135,7 +146,7 @@ export const Scrubber = ({
               setTyping(null);
             }
           }}
-          className="h-6 flex-1 bg-transparent pr-2 text-[11px] text-right outline-none"
+          className="h-6 flex-1 bg-transparent pr-2 text-right text-[11px] outline-none"
           style={{ color: 'var(--ui-text)' }}
         />
       ) : (

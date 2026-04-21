@@ -130,6 +130,65 @@ export const SPACING_SCALE = [
   0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 20, 24, 28, 32, 40, 48, 56, 64,
 ] as const;
 
+// Segmented-control item shape — kept here so tailwind-palette is the single
+// source of truth for control labels, and consumers don't need to cast.
+interface SegItem<K extends string> {
+  value: K;
+  label: string;
+  title: string;
+}
+
+export const FLEX_DIRECTIONS: readonly SegItem<
+  'flex-row' | 'flex-col' | 'flex-row-reverse' | 'flex-col-reverse'
+>[] = [
+  { value: 'flex-row', label: '→', title: 'Row' },
+  { value: 'flex-col', label: '↓', title: 'Column' },
+  { value: 'flex-row-reverse', label: '←', title: 'Row reverse' },
+  { value: 'flex-col-reverse', label: '↑', title: 'Column reverse' },
+];
+
+export const ALIGN_ITEMS: readonly SegItem<
+  'items-start' | 'items-center' | 'items-end' | 'items-stretch' | 'items-baseline'
+>[] = [
+  { value: 'items-start', label: '⇤', title: 'Start' },
+  { value: 'items-center', label: '⇔', title: 'Center' },
+  { value: 'items-end', label: '⇥', title: 'End' },
+  { value: 'items-stretch', label: '↔', title: 'Stretch' },
+  { value: 'items-baseline', label: 'Ab', title: 'Baseline' },
+];
+
+export const JUSTIFY_CONTENT: readonly SegItem<
+  | 'justify-start'
+  | 'justify-center'
+  | 'justify-end'
+  | 'justify-between'
+  | 'justify-around'
+  | 'justify-evenly'
+>[] = [
+  { value: 'justify-start', label: '⇤', title: 'Start' },
+  { value: 'justify-center', label: '⇔', title: 'Center' },
+  { value: 'justify-end', label: '⇥', title: 'End' },
+  { value: 'justify-between', label: '⇌', title: 'Between' },
+  { value: 'justify-around', label: '⇄', title: 'Around' },
+  { value: 'justify-evenly', label: '⇵', title: 'Evenly' },
+];
+
+export const TEXT_ALIGNS: readonly SegItem<
+  'text-left' | 'text-center' | 'text-right' | 'text-justify'
+>[] = [
+  { value: 'text-left', label: '⬱', title: 'Left' },
+  { value: 'text-center', label: '☰', title: 'Center' },
+  { value: 'text-right', label: '⇨', title: 'Right' },
+  { value: 'text-justify', label: '☷', title: 'Justify' },
+];
+
+// Display mode — flex / grid / off. Used by the Layout section's top switch.
+export const DISPLAY_MODES: readonly SegItem<'flex' | 'grid' | 'block'>[] = [
+  { value: 'flex', label: 'Flex', title: 'Flex layout' },
+  { value: 'grid', label: 'Grid', title: 'Grid layout' },
+  { value: 'block', label: 'Off', title: 'Block (no flex/grid)' },
+];
+
 // Tailwind's rounded scale.
 export const RADIUS_SCALE = [
   { key: 'rounded-none', label: 'none' },

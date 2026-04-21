@@ -52,5 +52,8 @@ export function useSelection(): {
     clear() {
       iframeRef.current?.contentWindow?.postMessage({ kind: 'clear' }, PREVIEW_URL);
     },
+    setMode(mode: 'edit' | 'preview') {
+      iframeRef.current?.contentWindow?.postMessage({ kind: 'mode', mode }, PREVIEW_URL);
+    },
   };
 }

@@ -161,6 +161,10 @@ export const editorToPreviewSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('clear'),
   }),
+  z.object({
+    kind: z.literal('mode'),
+    mode: z.enum(['edit', 'preview']),
+  }),
 ]);
 export type EditorToPreview = z.infer<typeof editorToPreviewSchema>;
 
