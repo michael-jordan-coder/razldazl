@@ -46,3 +46,14 @@ body {
   outline: 2px solid var(--ui-accent);
   outline-offset: 1px;
 }
+
+/* Chat animations */
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+@keyframes thinking {
+  0%, 100% { opacity: 0.3; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-1px); }
+}

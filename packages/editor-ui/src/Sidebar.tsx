@@ -1,6 +1,11 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import type { ChatPart } from '@product/protocol';
 import type { Selection } from './useSelection.js';
+import { ToolCallCard } from './chat/ToolCallCard.js';
+import { FileEditCard } from './chat/FileEditCard.js';
+import { SelectionPill } from './chat/SelectionPill.js';
+import { EmptyState } from './chat/EmptyState.js';
+import { ThinkingIndicator } from './chat/ThinkingIndicator.js';
 
 export interface SidebarProps {
   connected: boolean;
@@ -16,6 +21,7 @@ export interface SidebarProps {
   onRedo(): void;
   onSend(message: string): Promise<void> | void;
   onClear(): void;
+  onClearSelection(): void;
 }
 
 export const Sidebar = ({
@@ -32,28 +38,45 @@ export const Sidebar = ({
   onRedo,
   onSend,
   onClear,
+  onClearSelection,
 }: SidebarProps) => {
-  void selection;
   const [message, setMessage] = useState('');
+  const messagesRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
+  const submit = (e?: FormEvent) => {
+    e?.preventDefault();
     if (!message.trim() || sending) return;
     const text = message;
     setMessage('');
     void onSend(text);
   };
 
+  useEffect(() => {
+    const el = messagesRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [chatParts.length, sending]);
+
+  const pickSuggestion = (text: string) => {
+    setMessage(text);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  };
+
+  const lastPart = chatParts[chatParts.length - 1];
+  const lastIsFromUser = lastPart?.kind === 'text' && /^🧑/.test(lastPart.text);
+  const showThinking = sending && (!lastPart || lastIsFromUser);
+
   return (
     <aside
-      className="flex w-[300px] shrink-0 flex-col border-r text-[11px] leading-[16px]"
+      className="flex w-[320px] shrink-0 flex-col border-r text-[11px] leading-[16px]"
       style={{ background: 'var(--ui-bg)', borderColor: 'var(--ui-border)' }}
     >
       <header
-        className="flex h-[40px] shrink-0 items-center justify-between border-b pl-4 pr-2 text-[13px] font-medium"
+        className="flex h-[40px] shrink-0 items-center justify-between gap-2 border-b pl-3 pr-2 text-[13px] font-medium"
         style={{ borderColor: 'var(--ui-border)' }}
       >
-        <span>Chat</span>
+        <div style={{ color: 'var(--ui-text)' }}>Chat</div>
         <div className="flex items-center gap-0.5">
           <IconButton
             title="Undo (⌘Z)"
@@ -86,33 +109,41 @@ export const Sidebar = ({
       </div>
 
       <section
+        ref={messagesRef}
         className="flex-1 overflow-y-auto px-3 py-3"
         style={{ background: 'var(--ui-bg)' }}
       >
-        {chatParts.length === 0 ? (
-          <div className="text-[11px]" style={{ color: 'var(--ui-text-tertiary)' }}>
-            Describe a change. Select an element first, or let me find it.
-          </div>
+        {chatParts.length === 0 && !sending ? (
+          <EmptyState hasSelection={!!selection} onPick={pickSuggestion} />
         ) : (
-          <ul className="flex flex-col gap-1.5">
+          <ul className="flex flex-col gap-2">
             {chatParts.map((p, i) => (
               <li key={`${p.kind}-${i}`}>
                 <PartView part={p} />
               </li>
             ))}
+            {showThinking ? (
+              <li>
+                <ThinkingIndicator />
+              </li>
+            ) : null}
           </ul>
         )}
       </section>
 
       <form
         onSubmit={submit}
-        className="border-t p-2"
+        className="flex flex-col gap-1.5 border-t p-2"
         style={{ borderColor: 'var(--ui-border)' }}
       >
+        {selection ? (
+          <SelectionPill selection={selection} onClear={onClearSelection} />
+        ) : null}
         <textarea
+          ref={textareaRef}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="Describe a change…"
+          placeholder={selection ? 'Modify this element…' : 'Describe a change…'}
           className="w-full resize-none rounded-[5px] p-2 text-[11px] leading-[16px] outline-none placeholder:text-[var(--ui-text-tertiary)]"
           style={{
             background: 'var(--ui-bg-input)',
@@ -121,14 +152,24 @@ export const Sidebar = ({
           rows={3}
           disabled={sending || !connected}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(e);
+            const composing = e.nativeEvent.isComposing || e.keyCode === 229;
+            if (
+              e.key === 'Enter' &&
+              !e.shiftKey &&
+              !e.metaKey &&
+              !e.ctrlKey &&
+              !composing
+            ) {
+              e.preventDefault();
+              submit();
+            }
           }}
         />
         <div
-          className="mt-1 flex items-center justify-between text-[10px]"
+          className="flex items-center justify-between text-[10px]"
           style={{ color: 'var(--ui-text-tertiary)' }}
         >
-          <span>⌘↵ to send</span>
+          <span>↵ to send · ⇧↵ for newline</span>
           <button
             type="submit"
             disabled={sending || !connected || !message.trim()}
@@ -175,71 +216,42 @@ const Dot = ({ ok }: { ok: boolean }) => (
 
 const PartView = ({ part }: { part: ChatPart }) => {
   switch (part.kind) {
-    case 'text':
+    case 'text': {
+      const isUser = /^🧑/.test(part.text);
+      const body = isUser ? part.text.replace(/^🧑\s?/, '') : part.text;
       return (
         <div
-          className="whitespace-pre-wrap rounded-[5px] px-2 py-1.5 text-[11px]"
-          style={{ background: 'var(--ui-bg-input)', color: 'var(--ui-text)' }}
-        >
-          {part.text}
-        </div>
-      );
-    case 'tool-call':
-      return (
-        <div
-          className="rounded-[5px] px-2 py-1.5 text-[10px]"
+          className="rounded-[6px] px-2.5 py-1.5 text-[11px] leading-[17px]"
           style={{
-            background: 'var(--ui-bg-input)',
-            color: 'var(--ui-text-secondary)',
+            background: isUser ? 'var(--ui-accent-soft)' : 'var(--ui-bg-input)',
+            color: 'var(--ui-text)',
+            border: isUser ? '1px solid rgba(13,153,255,0.25)' : '1px solid var(--ui-border)',
+            whiteSpace: 'pre-wrap',
           }}
         >
-          <div className="flex items-center gap-1.5">
-            <span style={{ color: 'var(--ui-accent)' }}>{part.tool}</span>
-            <span
-              style={{
-                color:
-                  part.state === 'running'
-                    ? '#f5a524'
-                    : part.state === 'success'
-                      ? '#3bc876'
-                      : 'var(--ui-danger)',
-              }}
-            >
-              · {part.state}
-            </span>
-          </div>
-          {part.error && (
-            <div className="mt-1 text-[10px]" style={{ color: 'var(--ui-danger)' }}>
-              {part.error}
-            </div>
-          )}
+          {body}
         </div>
       );
+    }
+    case 'tool-call':
+      return <ToolCallCard part={part} />;
     case 'file-edit':
-      return (
-        <div
-          className="rounded-[5px] px-2 py-1.5 text-[10px]"
-          style={{ background: 'var(--ui-bg-input)' }}
-        >
-          <div style={{ color: '#3bc876' }}>edit · {part.path}</div>
-          <pre
-            className="mt-1 overflow-x-auto whitespace-pre-wrap font-mono text-[10px] leading-[14px]"
-            style={{ color: 'var(--ui-text-secondary)' }}
-          >
-            {part.diff}
-          </pre>
-        </div>
-      );
+      return <FileEditCard part={part} />;
     case 'app-validation':
       return (
         <div
-          className="rounded-[5px] px-2 py-1.5 text-[10px]"
+          className="rounded-[6px] border px-2.5 py-1.5 text-[10px]"
           style={{
-            background: 'var(--ui-bg-input)',
-            color: part.ok ? '#3bc876' : 'var(--ui-danger)',
+            background: part.ok
+              ? 'rgba(59, 200, 118, 0.06)'
+              : 'rgba(242, 72, 34, 0.06)',
+            borderColor: part.ok
+              ? 'rgba(59, 200, 118, 0.28)'
+              : 'rgba(242, 72, 34, 0.32)',
+            color: part.ok ? '#6ae89a' : 'var(--ui-danger)',
           }}
         >
-          validation {part.ok ? 'passed' : part.errors.join('\n')}
+          {part.ok ? '✓ Validation passed' : `✗ ${part.errors.join('\n')}`}
         </div>
       );
   }

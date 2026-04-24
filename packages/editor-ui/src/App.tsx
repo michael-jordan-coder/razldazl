@@ -129,6 +129,7 @@ export const App = () => {
               selectionApi.clear();
               ws.clearChat();
             }}
+            onClearSelection={selectionApi.clear}
           />
         )}
         <div className="flex-1 relative min-w-0">
