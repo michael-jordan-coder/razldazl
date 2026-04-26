@@ -13,6 +13,33 @@ A terse log of what changed each working session. Add an entry at the **top** ev
 
 ---
 
+## 2026-04-26 — Component picker (sub-deliverable D of UI library integration)
+
+**Goal:** Ship the visual half of the UI library integration feature (`PRODUCT-ROADMAP/features/ui-library-integration.md`) — a Figma-style floating component palette flyout from the bottom toolbar that inserts components into the JSX as children of the current selection. Ship before the AI-install half (sub-deliverables A + B) so the surface is validated and the user has insertable content from day one.
+
+**Shipped:**
+- `packages/editor-ui/src/componentLibrary.tsx` (new) — 6 starter components (Button, Card, Input, Badge, Heading, Paragraph), each a flat `JSXElementDescriptor` with a tiny inline-React preview rendered as a thumbnail. No external deps; pure Tailwind classes that work in any Vite + React + Tailwind project. Designed so AI-installed shadcn entries can append to the same array later.
+- `packages/editor-ui/src/ComponentPicker.tsx` (new) — flyout panel above the bottom toolbar (~480px wide, glass background matching the Select pill), 3-column grid, `aria-pressed` button state, Esc + outside-pointer-down to close. Empty hint when no element is selected ("Select an element first — components insert as a child of the selection."). Footer note: "AI-installed component libraries (shadcn, Radix) coming next."
+- `packages/editor-ui/src/FloatingToolbar.tsx` — Components button (LayoutGrid SVG path) added next to Select. Active state lifts on accent fill; inactive matches Select's secondary color and hover treatment. `data-floating-toolbar` attribute lets ComponentPicker's outside-pointer-down handler ignore clicks on the toolbar itself.
+- `packages/editor-ui/src/App.tsx` — `componentPickerOpen` state, **C** keyboard shortcut to toggle (V is Select), `onInsertComponent` handler dispatches an `addElement` op (`{ tool: 'addElement', args: { parent: selection.source, position: 'end', element: descriptor } }`) via the existing `astEdit apply` path. Selection re-locks after HMR like all other AI/AST edits.
+
+**Design decisions:**
+- *Click-to-insert at selection, not drag-and-drop.* Cross-iframe drag is materially harder (~3-4 sessions vs ~1 for click). v2 territory.
+- *Floating flyout, not a sidebar tab.* Matches the new floating-toolbar pattern; on-demand, doesn't eat chat sidebar real estate. Two clicks (open → select) accepted.
+- *Built-in starters before AI-installed shadcn.* Lets the surface and insertion flow be validated end-to-end without dependency on the AI shell-exec layer (sub-deliverables A + B). When AI install lands, shadcn entries append to `STARTER_COMPONENTS`.
+
+**Deferred / known issues:**
+- AI-driven shadcn install (`runShellCommand` tool, `npx shadcn@latest add` flow). Sub-deliverables A + B + C of the same feature.
+- Drag-and-drop insertion. v2.
+- Multi-element components (Card with header + body) — flat descriptor schema only allows single-element today; needs descriptor chains via multiple `addElement` ops.
+- `onApplyEdit` failures from the picker are currently swallowed by `void onApplyEdit(...)` — no chat error card. Polish: render a red `tool-call` part on failure.
+
+**Tests:** `vite build` clean (384 KB bundle, +6 KB over previous from the picker module). No new unit tests this session (UI-only; `addElement` is already covered by `ast-engine` structural-edits suite).
+
+**Gotcha worth knowing for future sessions:** found a stale `packages/protocol/dist/index.js` while debugging — the `addElement` schema in dist still expected `position: 'append'`, but source had been updated to `'start' | 'end'` in the 2026-04-21 structural-edits session. Editor-ui sends `'end'` (correct per source); server validates against compiled dist (rejected). Fix: `pnpm build` from this directory after any `packages/protocol/src/` change. Adding to `CLAUDE.md` gotchas section.
+
+---
+
 ## 2026-04-25 — Floating bottom-center tool palette
 
 **Goal:** Replace the top toolbar's Edit/Preview segmented control with a floating Figma-style tool palette pinned to the bottom-center of the preview pane. Selection capture should only be active when the user explicitly turns the Select tool on — clicks pass through to the live preview otherwise.

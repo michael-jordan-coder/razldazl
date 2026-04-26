@@ -97,6 +97,7 @@ Use these, not raw Tailwind colors. Compose via existing primitives in `packages
 - **Vite `?t=` query strings** appear on `fileName` in `__source`. Always strip via `split('?')[0]` or `resolveInsideRoot`.
 - **Pattern caching.** `className-utils.ts` exposes RegExp patterns as module-scope constants (`TEXT_SIZE_PATTERN` etc.) with back-compat function shims. Prefer the constants in new code.
 - **Radix Select** under Tailwind v4 needs `position="popper"` for the portal to size correctly.
+- **Always rebuild after touching `packages/protocol/src/`.** The server validates incoming WS messages against the **compiled** `packages/protocol/dist/index.js`, not the source. Editor-ui's bundle imports the same dist. After any protocol change (new tool variant, new field, renamed literal), run `pnpm build` from this directory before testing — otherwise the editor will send the new shape and the server will reject it as a `ZodError`. The 2026-04-26 session debugged this for an hour: `addElement.position` had been renamed `'append' → 'end'` in source but dist was stale, so every component-picker insert silently failed.
 
 ## Workflow
 
