@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { PreviewPane } from './PreviewPane.js';
 import { Sidebar } from './Sidebar.js';
 import { DesignPanel } from './DesignPanel.js';
 import { Toolbar, type EditorMode } from './Toolbar.js';
 import { FloatingToolbar } from './FloatingToolbar.js';
+import { ComponentPicker } from './ComponentPicker.js';
 import { useSelection } from './useSelection.js';
 import { useWS } from './useWS.js';
 import { useUndo } from './useUndo.js';
-import type { ToolCall } from '@product/protocol';
+import type { JSXElementDescriptor, ToolCall } from '@product/protocol';
 
 export const App = () => {
   const selectionApi = useSelection();
@@ -15,6 +16,7 @@ export const App = () => {
   const [sending, setSending] = useState(false);
   const [applying, setApplying] = useState(false);
   const [mode, setMode] = useState<EditorMode>('edit');
+  const [componentPickerOpen, setComponentPickerOpen] = useState(false);
 
   const undo = useUndo({
     client: ws.client,
@@ -53,6 +55,9 @@ export const App = () => {
       } else if (e.key === 'v' && !meta && !isTypingTarget(e.target)) {
         e.preventDefault();
         setMode((m) => (m === 'edit' ? 'preview' : 'edit'));
+      } else if (e.key === 'c' && !meta && !isTypingTarget(e.target)) {
+        e.preventDefault();
+        setComponentPickerOpen((o) => !o);
       } else if (e.key === 'Escape' && mode === 'preview') {
         setMode('edit');
       }
@@ -61,22 +66,43 @@ export const App = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [undo, mode]);
 
-  const onApplyEdit = async (ops: ToolCall[]) => {
-    if (!ws.client || !ws.ready) return;
-    setApplying(true);
-    try {
-      await undo.runAction(async () => {
-        await ws.client!.call('astEdit', 'apply', { ops });
-      });
-      if (selectionApi.selection) {
-        setTimeout(() => {
-          selectionApi.relock(selectionApi.selection!.source);
-        }, 150);
+  const onApplyEdit = useCallback(
+    async (ops: ToolCall[]) => {
+      if (!ws.client || !ws.ready) return;
+      setApplying(true);
+      try {
+        await undo.runAction(async () => {
+          await ws.client!.call('astEdit', 'apply', { ops });
+        });
+        if (selectionApi.selection) {
+          setTimeout(() => {
+            selectionApi.relock(selectionApi.selection!.source);
+          }, 150);
+        }
+      } finally {
+        setApplying(false);
       }
-    } finally {
-      setApplying(false);
-    }
-  };
+    },
+    [ws.client, ws.ready, undo, selectionApi]
+  );
+
+  const onInsertComponent = useCallback(
+    (descriptor: JSXElementDescriptor) => {
+      const selected = selectionApi.selection;
+      if (!selected) return;
+      void onApplyEdit([
+        {
+          tool: 'addElement',
+          args: {
+            parent: selected.source,
+            position: 'end',
+            element: descriptor,
+          },
+        },
+      ]);
+    },
+    [selectionApi.selection, onApplyEdit]
+  );
 
   const onSend = async (message: string) => {
     if (!ws.client || !ws.ready) return;
@@ -133,7 +159,18 @@ export const App = () => {
             iframeRef={selectionApi.iframeRef}
             selection={mode === 'edit' ? selectionApi.selection : null}
           />
-          <FloatingToolbar mode={mode} onModeChange={setMode} />
+          <FloatingToolbar
+            mode={mode}
+            onModeChange={setMode}
+            componentPickerOpen={componentPickerOpen}
+            onToggleComponentPicker={() => setComponentPickerOpen((o) => !o)}
+          />
+          <ComponentPicker
+            open={componentPickerOpen}
+            hasSelection={!!selectionApi.selection}
+            onClose={() => setComponentPickerOpen(false)}
+            onInsert={onInsertComponent}
+          />
         </div>
         {panelsVisible && (
           <DesignPanel
