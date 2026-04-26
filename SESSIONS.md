@@ -13,6 +13,28 @@ A terse log of what changed each working session. Add an entry at the **top** ev
 
 ---
 
+## 2026-04-25 — Floating bottom-center tool palette
+
+**Goal:** Replace the top toolbar's Edit/Preview segmented control with a floating Figma-style tool palette pinned to the bottom-center of the preview pane. Selection capture should only be active when the user explicitly turns the Select tool on — clicks pass through to the live preview otherwise.
+
+**Shipped:**
+- `packages/editor-ui/src/FloatingToolbar.tsx` (new) — `position: absolute` pill at `bottom-4 left-1/2 -translate-x-1/2 z-10` over the preview pane, `pointer-events-auto` only on the inner pill so clicks pass through everywhere else. First button is the Select tool: inline cursor SVG (Lucide `MousePointer2` path), `aria-pressed`, accent fill when active, hover tint when inactive, `title="Select (V)"`. Designed to grow more buttons (zoom, hand, comment) without layout changes.
+- `packages/editor-ui/src/Toolbar.tsx` — dropped `ModeSwitch` + the `mode` / `onModeChange` props. Top bar is now status-only (connection + preview dots, 100% zoom indicator). Single canonical control surface for tool selection lives in `FloatingToolbar`.
+- `packages/editor-ui/src/App.tsx` — render `<FloatingToolbar mode={mode} onModeChange={setMode} />` as a sibling of `<PreviewPane>` inside the existing `flex-1 relative` wrapper, so it overlays only the preview area, not the side panels. The V keyboard shortcut and the existing `panelsVisible = mode === 'edit'` guard both keep working unchanged — semantics preserved, surface relocated.
+- `packages/editor-ui/src/useSelection.ts` — added `setMode(mode: 'edit' | 'preview'): void` to the public return type (pre-existing type/impl drift; the impl already exported it, the signature didn't).
+
+**Design decisions:**
+- *Select tool replaces Edit/Preview, not a third state.* When the Select tool is OFF, the editor enters the existing preview mode (panels collapse, iframe interactive). When ON, the existing edit mode (panels visible, selection capture active). Daniel picked this over a coexist-with-segmented-control or a sub-tool model — Figma/Sketch convention.
+- *Floating bar overlays the preview only, not panels.* Keeps the tool palette out of the way of the chat sidebar and design panel; mirrors how Figma's toolbar sits over the canvas.
+
+**Deferred / known issues:**
+- More tools (zoom, hand, comment) — slot in as additional `<ToolButton>` rows when needed.
+- Pre-existing `exactOptionalPropertyTypes` TS errors in `design/Select.tsx`, `RadiusPicker.tsx`, `SizePicker.tsx`, `WeightPicker.tsx` — `disabled?: boolean` propagating through `Select` primitive. Not introduced by this session; out of scope.
+
+**Tests:** No new tests this session (UI-only relayout, no behavior change). `vite build` produces a clean 378 KB JS bundle in 721ms.
+
+---
+
 ## 2026-04-21 — Structural AST edits (add / wrap / delete / move)
 
 **Goal:** Add the four structural primitives to the engine, protocol, and AI tool layer, so both the AI and future panel controls can change tree shape — not just attributes and text.

@@ -3,6 +3,7 @@ import { PreviewPane } from './PreviewPane.js';
 import { Sidebar } from './Sidebar.js';
 import { DesignPanel } from './DesignPanel.js';
 import { Toolbar, type EditorMode } from './Toolbar.js';
+import { FloatingToolbar } from './FloatingToolbar.js';
 import { useSelection } from './useSelection.js';
 import { useWS } from './useWS.js';
 import { useUndo } from './useUndo.js';
@@ -104,12 +105,7 @@ export const App = () => {
       className="flex h-full flex-col"
       style={{ background: 'var(--ui-bg)', color: 'var(--ui-text)' }}
     >
-      <Toolbar
-        connected={ws.ready}
-        previewReady={selectionApi.previewReady}
-        mode={mode}
-        onModeChange={setMode}
-      />
+      <Toolbar connected={ws.ready} previewReady={selectionApi.previewReady} />
       <div className="flex flex-1 min-h-0">
         {panelsVisible && (
           <Sidebar
@@ -137,6 +133,7 @@ export const App = () => {
             iframeRef={selectionApi.iframeRef}
             selection={mode === 'edit' ? selectionApi.selection : null}
           />
+          <FloatingToolbar mode={mode} onModeChange={setMode} />
         </div>
         {panelsVisible && (
           <DesignPanel

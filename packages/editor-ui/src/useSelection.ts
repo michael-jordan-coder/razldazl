@@ -16,6 +16,7 @@ export function useSelection(): {
   iframeRef: React.RefObject<HTMLIFrameElement | null>;
   relock(source: JSXSource): void;
   clear(): void;
+  setMode(mode: 'edit' | 'preview'): void;
 } {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [previewReady, setPreviewReady] = useState(false);

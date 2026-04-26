@@ -1,20 +1,17 @@
-// Top toolbar: 40px row spanning the full editor width. Left side shows
-// connection/preview status dots, center holds the Edit/Preview segmented
-// control (primary mode switch), right side is room for zoom / device presets
-// in future slices.
-
-import { SegmentedControl } from './design/primitives/SegmentedControl.js';
+// Top toolbar: 40px row spanning the full editor width. Connection +
+// preview status on the left, zoom indicator on the right. The mode
+// switcher (Edit / Preview) used to live here — it's now driven by the
+// `Select` tool button in the floating bottom toolbar (`FloatingToolbar`),
+// which is the single canonical control surface for tool selection.
 
 export type EditorMode = 'edit' | 'preview';
 
 export interface ToolbarProps {
   connected: boolean;
   previewReady: boolean;
-  mode: EditorMode;
-  onModeChange: (mode: EditorMode) => void;
 }
 
-export const Toolbar = ({ connected, previewReady, mode, onModeChange }: ToolbarProps) => (
+export const Toolbar = ({ connected, previewReady }: ToolbarProps) => (
   <header
     className="flex h-[40px] shrink-0 items-center justify-between border-b px-3 text-[11px] leading-[16px] tracking-[0.055px]"
     style={{ background: 'var(--ui-bg)', borderColor: 'var(--ui-border)' }}
@@ -24,9 +21,7 @@ export const Toolbar = ({ connected, previewReady, mode, onModeChange }: Toolbar
       <StatusChip ok={previewReady} label={previewReady ? 'Preview' : 'Loading'} />
     </div>
 
-    <ModeSwitch mode={mode} onChange={onModeChange} />
-
-    <div className="w-[120px] text-right text-[11px]" style={{ color: 'var(--ui-text-tertiary)' }}>
+    <div className="text-[11px]" style={{ color: 'var(--ui-text-tertiary)' }}>
       100%
     </div>
   </header>
@@ -40,22 +35,4 @@ const StatusChip = ({ ok, label }: { ok: boolean; label: string }) => (
     />
     <span>{label}</span>
   </span>
-);
-
-const ModeSwitch = ({
-  mode,
-  onChange,
-}: {
-  mode: EditorMode;
-  onChange: (m: EditorMode) => void;
-}) => (
-  <SegmentedControl<EditorMode>
-    ariaLabel="Editor mode"
-    value={mode}
-    onChange={onChange}
-    items={[
-      { value: 'edit', label: 'Edit' },
-      { value: 'preview', label: 'Preview' },
-    ]}
-  />
 );
